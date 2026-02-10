@@ -49,6 +49,10 @@ class AnalysisActivity : BaseActivity() {
     private var isProcessing = false
     private var shouldSave = true
 
+    companion object {
+        const val EXTRA_SHOULD_SAVE = "should_save"
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_analysis)
@@ -60,7 +64,7 @@ class AnalysisActivity : BaseActivity() {
         }
 
         // Get intent extras
-        shouldSave = intent.getBooleanExtra("should_save", true)
+        shouldSave = intent.getBooleanExtra(EXTRA_SHOULD_SAVE, true)
 
         // Get the video URI from VideoPickerActivity
         intent.data?.let { uri ->
@@ -93,11 +97,9 @@ class AnalysisActivity : BaseActivity() {
         findViewById<View>(R.id.infoSection).visibility = View.VISIBLE
 
         // Update participant info
-        if (shouldSave) {
-            findViewById<TextView>(R.id.tvParticipantInfo).text = "Participant: $participantId\nHeight: ${participantHeight / 12}'${participantHeight % 12}\""
-        } else {
-             findViewById<TextView>(R.id.tvParticipantInfo).text = "Quick Analysis\nHeight: ${participantHeight / 12}'${participantHeight % 12}\""
-        }
+        // Update participant info
+        val participantLabel = if (shouldSave) "Participant: $participantId" else "Quick Analysis"
+        findViewById<TextView>(R.id.tvParticipantInfo).text = "$participantLabel\nHeight: ${participantHeight / 12}'${participantHeight % 12}\""
 
         galleryUri?.let {
             findViewById<TextView>(R.id.tvVideoStatus).text = "Video ready for analysis"
@@ -135,7 +137,7 @@ class AnalysisActivity : BaseActivity() {
 
         lifecycleScope.launch {
             try {
-                // First, create/find patient in database
+            try {
                 // First, create/find patient in database if saving is enabled
                 val database = AppDatabase.getDatabase(this@AnalysisActivity)
                 
@@ -258,11 +260,7 @@ class AnalysisActivity : BaseActivity() {
         findViewById<View>(R.id.videoSection).visibility = View.VISIBLE
         findViewById<View>(R.id.anglesSection).visibility = View.VISIBLE
         
-        if (shouldSave) {
-            findViewById<Button>(R.id.btnViewResults).visibility = View.VISIBLE
-        } else {
-             findViewById<Button>(R.id.btnViewResults).visibility = View.GONE
-        }
+        findViewById<Button>(R.id.btnViewResults).visibility = if (shouldSave) View.VISIBLE else View.GONE
         
         findViewById<Button>(R.id.btnRunAnalysis).visibility = View.GONE
 

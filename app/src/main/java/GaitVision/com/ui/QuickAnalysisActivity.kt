@@ -95,7 +95,7 @@ class QuickAnalysisActivity : BaseActivity() {
             if (validateAndSaveInputs()) {
                 val intent = Intent(this, VideoPickerActivity::class.java)
                 intent.putExtra("mode", "record")
-                intent.putExtra("return_result", true)
+                intent.putExtra(VideoPickerActivity.EXTRA_RETURN_RESULT, true)
                 videoPickerLauncher.launch(intent)
             }
         }
@@ -104,7 +104,7 @@ class QuickAnalysisActivity : BaseActivity() {
             if (validateAndSaveInputs()) {
                 val intent = Intent(this, VideoPickerActivity::class.java)
                 intent.putExtra("mode", "gallery")
-                intent.putExtra("return_result", true)
+                intent.putExtra(VideoPickerActivity.EXTRA_RETURN_RESULT, true)
                 videoPickerLauncher.launch(intent)
             }
         }
@@ -112,7 +112,7 @@ class QuickAnalysisActivity : BaseActivity() {
         findViewById<Button>(R.id.btnAnalyze).setOnClickListener {
             if (validateForAnalysis()) {
                 startActivity(Intent(this, AnalysisActivity::class.java).apply {
-                    putExtra("should_save", false)
+                    putExtra(AnalysisActivity.EXTRA_SHOULD_SAVE, false)
                 })
             }
         }

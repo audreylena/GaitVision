@@ -23,6 +23,10 @@ class VideoPickerActivity : BaseActivity() {
     private lateinit var tvPlaceholder: TextView
     private lateinit var tvStatus: TextView
     private lateinit var btnContinue: Button
+    
+    companion object {
+        const val EXTRA_RETURN_RESULT = "return_result"
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -87,7 +91,7 @@ class VideoPickerActivity : BaseActivity() {
 
         btnContinue.setOnClickListener {
             selectedVideo?.let { uri ->
-                if (intent.getBooleanExtra("return_result", false)) {
+                if (intent.getBooleanExtra(EXTRA_RETURN_RESULT, false)) {
                     val resultIntent = Intent().apply {
                         data = uri
                     }

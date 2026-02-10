@@ -66,6 +66,7 @@ class PatientProfileActivity : BaseActivity() {
         videoDao = database.videoDao()
         gaitScoreDao = database.gaitScoreDao()
 
+        setupCommonHeader("Patient Profile")
         initViews()
         setupRecyclerView()
         loadPatientData()
@@ -82,10 +83,6 @@ class PatientProfileActivity : BaseActivity() {
         tvAvgScore = findViewById(R.id.tvAvgScore)
         rvAnalyses = findViewById(R.id.rvAnalyses)
         emptyAnalysisState = findViewById(R.id.emptyAnalysisState)
-
-        findViewById<ImageButton>(R.id.btnBack).setOnClickListener {
-            finish()
-        }
 
         findViewById<ImageButton>(R.id.btnEdit).setOnClickListener {
             val intent = Intent(this, PatientCreateActivity::class.java)

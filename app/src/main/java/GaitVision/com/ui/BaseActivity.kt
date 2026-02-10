@@ -11,6 +11,8 @@ import GaitVision.com.R
  */
 abstract class BaseActivity : AppCompatActivity() {
 
+    private val btnBack: ImageButton? by lazy { findViewById(R.id.btnBack) }
+
     /**
      * Set up the common header with back button and title
      * @param title The title to display in the header
@@ -29,7 +31,6 @@ abstract class BaseActivity : AppCompatActivity() {
         tvTitle?.text = title
 
         if (showBackButton) {
-            val btnBack = findViewById<ImageButton>(R.id.btnBack)
             btnBack?.setOnClickListener {
                 finish()
             }
@@ -40,7 +41,6 @@ abstract class BaseActivity : AppCompatActivity() {
      * custom back button action
      */
     protected fun setCustomBackAction(action: () -> Unit) {
-        val btnBack = findViewById<ImageButton>(R.id.btnBack)
         btnBack?.setOnClickListener {
             action()
         }

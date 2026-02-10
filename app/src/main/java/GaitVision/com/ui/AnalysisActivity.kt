@@ -64,7 +64,7 @@ class AnalysisActivity : BaseActivity() {
         }
 
         // Get intent extras
-        shouldSave = intent.getBooleanExtra(EXTRA_SHOULD_SAVE, true)
+        shouldSave = intent.getBooleanExtra(EXTRA_SHOULD_SAVE, false)
 
         // Get the video URI from VideoPickerActivity
         intent.data?.let { uri ->
@@ -96,7 +96,6 @@ class AnalysisActivity : BaseActivity() {
         // Show info section
         findViewById<View>(R.id.infoSection).visibility = View.VISIBLE
 
-        // Update participant info
         // Update participant info
         val participantLabel = if (shouldSave) "Participant: $participantId" else "Quick Analysis"
         findViewById<TextView>(R.id.tvParticipantInfo).text = "$participantLabel\nHeight: ${participantHeight / 12}'${participantHeight % 12}\""
@@ -136,7 +135,6 @@ class AnalysisActivity : BaseActivity() {
         findViewById<View>(R.id.progressSection).visibility = View.VISIBLE
 
         lifecycleScope.launch {
-            try {
             try {
                 // First, create/find patient in database if saving is enabled
                 val database = AppDatabase.getDatabase(this@AnalysisActivity)

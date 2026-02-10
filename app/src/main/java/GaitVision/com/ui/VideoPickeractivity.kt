@@ -100,6 +100,7 @@ class VideoPickerActivity : BaseActivity() {
                 } else {
                     val intent = Intent(this, AnalysisActivity::class.java).apply {
                         data = uri
+                        putExtra(AnalysisActivity.EXTRA_SHOULD_SAVE, true)
                     }
                     startActivity(intent)
                 }

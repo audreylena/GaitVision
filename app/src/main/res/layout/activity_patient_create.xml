@@ -3,43 +3,22 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#1A1A2E"
+    style="@style/ActivityContainer"
     android:fillViewport="true">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="16dp">
+        android:orientation="vertical">
 
         <!-- Header -->
+        <include layout="@layout/layout_common_header" />
+
         <LinearLayout
+            style="@style/ContentContainer"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:layout_marginBottom="24dp">
-
-            <ImageButton
-                android:id="@+id/btnBack"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:src="@android:drawable/ic_menu_revert"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="Back"
-                app:tint="#FFFFFF" />
-
-            <TextView
-                android:id="@+id/tvTitle"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="New Patient"
-                android:textColor="#FFFFFF"
-                android:textSize="24sp"
-                android:textStyle="bold"
-                android:layout_marginStart="8dp" />
-        </LinearLayout>
+            android:orientation="vertical">
 
         <!-- Auto-generated Patient ID Display -->
         <LinearLayout
@@ -300,6 +279,7 @@
             app:cornerRadius="12dp"
             android:layout_marginBottom="16dp" />
 
+        </LinearLayout>
     </LinearLayout>
 </ScrollView>
 

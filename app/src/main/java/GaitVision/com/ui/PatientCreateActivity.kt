@@ -5,8 +5,13 @@ import android.graphics.Color
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
-import android.widget.*
-import androidx.appcompat.app.AppCompatActivity
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
+import android.widget.Button
+import android.widget.EditText
+import android.widget.Spinner
+import android.widget.TextView
+import android.widget.Toast
 import androidx.lifecycle.lifecycleScope
 import GaitVision.com.R
 import GaitVision.com.data.AppDatabase
@@ -19,7 +24,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-class PatientCreateActivity : AppCompatActivity() {
+class PatientCreateActivity : BaseActivity() {
 
     private lateinit var patientDao: PatientDao
     
@@ -33,7 +38,6 @@ class PatientCreateActivity : AppCompatActivity() {
     private lateinit var etNotes: EditText
     private lateinit var btnCreatePatient: Button
     private lateinit var btnCreateAndAnalyze: Button
-    private lateinit var tvTitle: TextView
 
     private var editingPatientId: Int = -1
 
@@ -44,7 +48,10 @@ class PatientCreateActivity : AppCompatActivity() {
         val database = AppDatabase.getDatabase(this)
         patientDao = database.patientDao()
 
+        // Determine if we're editing an existing patient
         editingPatientId = intent.getLongExtra("patientId", -1).toInt()
+        val isEditing = editingPatientId != -1
+        setupCommonHeader(if (isEditing) "Edit Patient" else "New Patient")
 
         initViews()
         setupSpinners()
@@ -56,7 +63,6 @@ class PatientCreateActivity : AppCompatActivity() {
 
     private fun initViews() {
         tvPatientId = findViewById(R.id.tvPatientId)
-        tvTitle = findViewById(R.id.tvTitle)
         etFirstName = findViewById(R.id.etFirstName)
         etLastName = findViewById(R.id.etLastName)
         etAge = findViewById(R.id.etAge)
@@ -66,10 +72,6 @@ class PatientCreateActivity : AppCompatActivity() {
         etNotes = findViewById(R.id.etNotes)
         btnCreatePatient = findViewById(R.id.btnCreatePatient)
         btnCreateAndAnalyze = findViewById(R.id.btnCreateAndAnalyze)
-
-        findViewById<ImageButton>(R.id.btnBack).setOnClickListener {
-            finish()
-        }
 
         btnCreatePatient.setOnClickListener {
             if (validateInputs()) {
@@ -84,7 +86,6 @@ class PatientCreateActivity : AppCompatActivity() {
         }
 
         if (editingPatientId > 0) {
-            tvTitle.text = "Edit Patient"
             btnCreatePatient.text = "Save Changes"
             btnCreateAndAnalyze.text = "Save & Start Analysis →"
         } else {

@@ -1,57 +1,39 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="#1A1A2E"
-    android:padding="16dp">
+    style="@style/ActivityContainer">
 
     <!-- Header -->
-    <LinearLayout
-        android:layout_width="match_parent"
+    <include
+        android:id="@+id/header"
+        layout="@layout/layout_common_header" />
+
+    <!-- Patient Count (additional element in header area) -->
+    <TextView
+        android:id="@+id/tvPatientCount"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:layout_marginBottom="16dp">
-
-        <ImageButton
-            android:id="@+id/btnBack"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:src="@android:drawable/ic_menu_revert"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="Back"
-            app:tint="#FFFFFF" />
-
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Patient Directory"
-            android:textColor="#FFFFFF"
-            android:textSize="24sp"
-            android:textStyle="bold"
-            android:layout_marginStart="8dp" />
-
-        <TextView
-            android:id="@+id/tvPatientCount"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="0 patients"
-            android:textColor="#888888"
-            android:textSize="14sp" />
-    </LinearLayout>
+        android:layout_alignParentTop="true"
+        android:layout_alignParentEnd="true"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="16dp"
+        android:text="0 patients"
+        android:textColor="#888888"
+        android:textSize="14sp" />
 
     <!-- Search Bar -->
     <LinearLayout
+        android:id="@+id/searchBar"
+        style="@style/LayoutMargins"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_below="@id/header"
         android:orientation="horizontal"
         android:background="@drawable/edit_text_background"
-        android:padding="4dp"
-        android:layout_marginBottom="12dp">
+        android:padding="4dp">
 
         <EditText
             android:id="@+id/etSearch"
@@ -80,8 +62,11 @@
 
     <!-- Filter Chips -->
     <HorizontalScrollView
+        android:id="@+id/filterChips"
+        style="@style/LayoutMargins.HorizontalOnly"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_below="@id/searchBar"
         android:scrollbars="none"
         android:layout_marginBottom="12dp">
 
@@ -131,8 +116,11 @@
 
     <!-- Patient Table Header -->
     <LinearLayout
+        android:id="@+id/tableHeader"
+        style="@style/LayoutMargins.HorizontalOnly"
         android:layout_width="match_parent"
         android:layout_height="40dp"
+        android:layout_below="@id/filterChips"
         android:orientation="horizontal"
         android:background="#252542"
         android:gravity="center_vertical"
@@ -168,9 +156,6 @@
             android:textColor="#888888"
             android:textSize="12sp"
             android:textStyle="bold" />
-            android:textColor="#888888"
-            android:textSize="12sp"
-            android:textStyle="bold" />
 
         <TextView
             android:id="@+id/tvHeaderAge"
@@ -198,19 +183,23 @@
     <!-- Patient List (RecyclerView) -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvPatients"
+        style="@style/LayoutMargins.Content"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
+        android:layout_height="match_parent"
+        android:layout_below="@id/tableHeader"
+        android:layout_above="@id/fabAddPatient"
         android:background="#1E1E36"
         android:clipToPadding="false"
-        android:paddingBottom="80dp" />
+        android:paddingBottom="16dp" />
 
     <!-- Empty State -->
         <LinearLayout
             android:id="@+id/emptyState"
+            style="@style/LayoutMargins.Content"
             android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
+            android:layout_height="match_parent"
+            android:layout_below="@id/tableHeader"
+            android:layout_above="@id/fabAddPatient"
             android:orientation="vertical"
             android:gravity="center"
             android:visibility="gone">
@@ -248,12 +237,13 @@
         android:id="@+id/fabAddPatient"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_gravity="bottom|end"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentEnd="true"
         android:layout_margin="16dp"
         android:src="@android:drawable/ic_input_add"
         app:backgroundTint="#4CAF50"
         app:tint="#FFFFFF"
         android:contentDescription="Add Patient" />
 
-</LinearLayout>
+</RelativeLayout>
 

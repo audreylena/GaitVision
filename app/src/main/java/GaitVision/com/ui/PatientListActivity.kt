@@ -12,7 +12,6 @@ import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.TextView
 import android.widget.Toast
-import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -29,7 +28,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.runBlocking
 
 
-class PatientListActivity : AppCompatActivity() {
+class PatientListActivity : BaseActivity() {
 
     private lateinit var patientDao: PatientDao
     private lateinit var videoDao: VideoDao
@@ -54,6 +53,8 @@ class PatientListActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_patient_list)
 
+        setupCommonHeader("Patient Directory")
+
         val database = AppDatabase.getDatabase(this)
         patientDao = database.patientDao()
         videoDao = database.videoDao()
@@ -70,16 +71,12 @@ class PatientListActivity : AppCompatActivity() {
         emptyState = findViewById(R.id.emptyState)
         tvPatientCount = findViewById(R.id.tvPatientCount)
         etSearch = findViewById(R.id.etSearch)
-        btnClearSearch = findViewById(R.id.btnClearSearch)
+        btnClearSearch = findViewById<ImageButton>(R.id.btnClearSearch)
         tvHeaderId = findViewById(R.id.tvHeaderId)
         tvHeaderFirstName = findViewById(R.id.tvHeaderFirstName)
         tvHeaderLastName = findViewById(R.id.tvHeaderLastName)
         tvHeaderAge = findViewById(R.id.tvHeaderAge)
         tvHeaderVideos = findViewById(R.id.tvHeaderVideos)
-
-        findViewById<ImageButton>(R.id.btnBack).setOnClickListener {
-            finish()
-        }
 
         findViewById<FloatingActionButton>(R.id.fabAddPatient).setOnClickListener {
             startActivity(Intent(this, PatientCreateActivity::class.java))

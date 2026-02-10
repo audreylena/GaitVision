@@ -10,12 +10,12 @@ import android.os.Looper
 import android.util.Log
 import android.view.View
 import android.widget.Button
+import android.widget.ImageButton
 import android.widget.MediaController
 import android.widget.PopupMenu
 import android.widget.TextView
 import android.widget.Toast
 import android.widget.VideoView
-import androidx.appcompat.app.AppCompatActivity
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.constraintlayout.widget.ConstraintSet
 import androidx.lifecycle.lifecycleScope
@@ -42,7 +42,7 @@ import GaitVision.com.videoLength
 import GaitVision.com.extractedFeatures
 import java.io.File
 
-class AnalysisActivity : AppCompatActivity() {
+class AnalysisActivity : BaseActivity() {
 
     private val handler = Handler(Looper.getMainLooper())
     private var updateRunnable: Runnable? = null
@@ -51,6 +51,12 @@ class AnalysisActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_analysis)
+
+        setupCommonHeader("Gait Analysis")
+        setCustomBackAction {
+            updateRunnable?.let { handler.removeCallbacks(it) }
+            finish()
+        }
 
         // Get the video URI from VideoPickerActivity
         intent.data?.let { uri ->
@@ -102,11 +108,6 @@ class AnalysisActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btnViewResults).setOnClickListener {
             updateRunnable?.let { handler.removeCallbacks(it) }
             startActivity(Intent(this, ResultsActivity::class.java))
-        }
-
-        findViewById<Button>(R.id.btnBack).setOnClickListener {
-            updateRunnable?.let { handler.removeCallbacks(it) }
-            finish()
         }
 
         // Angle selection popup

@@ -6,33 +6,45 @@ import android.provider.MediaStore
 import android.util.Log
 import android.view.View
 import android.widget.Button
+import android.widget.ImageButton
 import android.widget.TextView
 import android.widget.VideoView
 import android.widget.Toast
 import android.net.Uri
-import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.PickVisualMediaRequest
 import GaitVision.com.R
 
-class VideoPickerActivity : AppCompatActivity() {
+class VideoPickerActivity : BaseActivity() {
 
     private var selectedVideo: Uri? = null
+
+    private lateinit var videoView: VideoView
+    private lateinit var tvPlaceholder: TextView
+    private lateinit var tvStatus: TextView
+    private lateinit var btnContinue: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_video_picker)
 
-        val videoView = findViewById<VideoView>(R.id.videoView)
-        val tvPlaceholder = findViewById<TextView>(R.id.tvPlaceholder)
-        val tvStatus = findViewById<TextView>(R.id.tvStatus)
-        val btnContinue = findViewById<Button>(R.id.btnContinue)
+        // Initialize view properties
+        videoView = findViewById(R.id.videoView)
+        tvPlaceholder = findViewById(R.id.tvPlaceholder)
+        tvStatus = findViewById(R.id.tvStatus)
+        btnContinue = findViewById(R.id.btnContinue)
+
+        setupCommonHeader("Select Video")
+        setupButtons()
+    }
+
+    private fun setupButtons() {
 
         // photo picker api
         val pickVideoLauncher =
             registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri: Uri? ->
                 Log.d("VideoPicker", "Selected URI: $uri")
-                
+
                 uri?.let { videoUri ->
                     selectedVideo = videoUri
 
@@ -51,7 +63,11 @@ class VideoPickerActivity : AppCompatActivity() {
                     Log.d("VideoPicker", "Video playback started")
                 } ?: run {
                     Log.e("VideoPicker", "URI is null - no video selected or permission denied")
-                    Toast.makeText(this, "Failed to load video. Please try again.", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        this,
+                        "Failed to load video. Please try again.",
+                        Toast.LENGTH_SHORT
+                    ).show()
                     tvStatus.text = "Failed to load video"
                 }
             }
@@ -68,7 +84,7 @@ class VideoPickerActivity : AppCompatActivity() {
             val recordIntent = Intent(MediaStore.ACTION_VIDEO_CAPTURE)
             startActivity(recordIntent)
         }
-        
+
         btnContinue.setOnClickListener {
             selectedVideo?.let { uri ->
                 val intent = Intent(this, AnalysisActivity::class.java).apply {

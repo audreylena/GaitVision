@@ -8,7 +8,6 @@ import android.widget.Button
 import android.widget.PopupMenu
 import android.widget.TextView
 import android.widget.Toast
-import androidx.appcompat.app.AppCompatActivity
 import com.github.mikephil.charting.charts.LineChart
 import com.github.mikephil.charting.components.LimitLine
 import com.github.mikephil.charting.data.Entry
@@ -29,7 +28,7 @@ import GaitVision.com.gait.Signals
  * Mirrors the PC pipeline's expanded_dashboard.py visualization.
  * at some point the goal is to have the app process the traiing batch, so pc parity will be abandonded
  */
-class SignalsDashboardActivity : AppCompatActivity() {
+class SignalsDashboardActivity : BaseActivity() {
 
     companion object {
         private const val TAG = "SignalsDashboard"
@@ -54,6 +53,7 @@ class SignalsDashboardActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_signals_dashboard)
 
+        setupCommonHeader("Signal Dashboard")
         initializeViews()
         setupButtons()
         loadData()
@@ -101,10 +101,6 @@ class SignalsDashboardActivity : AppCompatActivity() {
     }
 
     private fun setupButtons() {
-        findViewById<Button>(R.id.btnBack).setOnClickListener {
-            finish()
-        }
-
         btnSelectSignal.setOnClickListener {
             showSignalPopup()
         }

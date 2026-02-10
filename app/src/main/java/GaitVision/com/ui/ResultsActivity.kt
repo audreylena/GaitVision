@@ -12,7 +12,6 @@ import android.widget.Button
 import android.widget.PopupMenu
 import android.widget.TextView
 import android.widget.Toast
-import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.github.mikephil.charting.charts.LineChart
 import kotlinx.coroutines.Dispatchers
@@ -36,7 +35,7 @@ import GaitVision.com.galleryUri
 import java.io.File
 import java.io.FileOutputStream
 
-class ResultsActivity : AppCompatActivity() {
+class ResultsActivity : BaseActivity() {
 
     private lateinit var tvGaitScore: TextView
     private lateinit var tvScoreLabel: TextView
@@ -55,6 +54,7 @@ class ResultsActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_results)
 
+        setupCommonHeader("Analysis Results")
         initializeViews()
         setupButtons()
         
@@ -79,10 +79,6 @@ class ResultsActivity : AppCompatActivity() {
     }
 
     private fun setupButtons() {
-        findViewById<Button>(R.id.btnBack).setOnClickListener {
-            finish()
-        }
-
         findViewById<Button>(R.id.btnMainMenu).setOnClickListener {
             // Go back to dashboard and clear the back stack
             val intent = Intent(this, DashboardActivity::class.java)

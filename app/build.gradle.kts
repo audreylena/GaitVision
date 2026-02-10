@@ -16,9 +16,6 @@ android {
         versionCode = 1
         versionName = "1.0"
 
-        ndk {
-            abiFilters += listOf("arm64-v8a","x86_64")
-        }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -73,7 +70,7 @@ dependencies {
 
     // MediaPipe Tasks for pose detection (replaced MLKit for PC pipeline parity)
     // UPGRADED from 0.10.14 to fix "non-square landmark projection" bug that caused ~0.1% Y-offset
-    implementation("com.google.mediapipe:tasks-vision:0.10.18")
+    implementation("com.google.mediapipe:tasks-vision:0.10.29")
 
     implementation("androidx.core:core-ktx:1.7.0")
 

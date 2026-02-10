@@ -6,6 +6,7 @@ import android.provider.MediaStore
 import android.util.Log
 import android.view.View
 import android.widget.Button
+import android.widget.ImageButton
 import android.widget.TextView
 import android.widget.VideoView
 import android.widget.Toast
@@ -28,11 +29,27 @@ class VideoPickerActivity : AppCompatActivity() {
         val tvStatus = findViewById<TextView>(R.id.tvStatus)
         val btnContinue = findViewById<Button>(R.id.btnContinue)
 
+        setupBackButton()
+        setupButtons()
+    }
+
+    private fun setupBackButton() {
+        findViewById<ImageButton>(R.id.btnBack).setOnClickListener {
+            finish()
+        }
+    }
+
+    private fun setupButtons() {
+        val videoView = findViewById<VideoView>(R.id.videoView)
+        val tvPlaceholder = findViewById<TextView>(R.id.tvPlaceholder)
+        val tvStatus = findViewById<TextView>(R.id.tvStatus)
+        val btnContinue = findViewById<Button>(R.id.btnContinue)
+
         // photo picker api
         val pickVideoLauncher =
             registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri: Uri? ->
                 Log.d("VideoPicker", "Selected URI: $uri")
-                
+
                 uri?.let { videoUri ->
                     selectedVideo = videoUri
 
@@ -51,7 +68,11 @@ class VideoPickerActivity : AppCompatActivity() {
                     Log.d("VideoPicker", "Video playback started")
                 } ?: run {
                     Log.e("VideoPicker", "URI is null - no video selected or permission denied")
-                    Toast.makeText(this, "Failed to load video. Please try again.", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        this,
+                        "Failed to load video. Please try again.",
+                        Toast.LENGTH_SHORT
+                    ).show()
                     tvStatus.text = "Failed to load video"
                 }
             }
@@ -68,7 +89,7 @@ class VideoPickerActivity : AppCompatActivity() {
             val recordIntent = Intent(MediaStore.ACTION_VIDEO_CAPTURE)
             startActivity(recordIntent)
         }
-        
+
         btnContinue.setOnClickListener {
             selectedVideo?.let { uri ->
                 val intent = Intent(this, AnalysisActivity::class.java).apply {

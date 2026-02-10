@@ -6,7 +6,6 @@ import android.os.Bundle
 import android.util.Log
 import android.widget.Button
 import android.widget.EditText
-import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
@@ -29,7 +28,7 @@ import GaitVision.com.extractedStrides
 import GaitVision.com.selectedStrideIndices
 import GaitVision.com.stepSignalMode
 
-class QuickAnalysisActivity : AppCompatActivity() {
+class QuickAnalysisActivity : BaseActivity() {
 
     private lateinit var videoPreview: ImageView
     private lateinit var etFeet: EditText
@@ -47,15 +46,10 @@ class QuickAnalysisActivity : AppCompatActivity() {
 
         resetGlobalState()
         initializeViews()
-        setupBackButton()
+        setupCommonHeader("Quick Analysis")
         setupButtons()
     }
 
-    private fun setupBackButton() {
-        findViewById<ImageButton>(R.id.btnBack).setOnClickListener {
-            finish()
-        }
-    }
 
     override fun onResume() {
         super.onResume()

@@ -10,6 +10,7 @@ import android.os.Looper
 import android.util.Log
 import android.view.View
 import android.widget.Button
+import android.widget.ImageButton
 import android.widget.MediaController
 import android.widget.PopupMenu
 import android.widget.TextView
@@ -104,7 +105,7 @@ class AnalysisActivity : AppCompatActivity() {
             startActivity(Intent(this, ResultsActivity::class.java))
         }
 
-        findViewById<Button>(R.id.btnBack).setOnClickListener {
+        findViewById<ImageButton>(R.id.btnBack).setOnClickListener {
             updateRunnable?.let { handler.removeCallbacks(it) }
             finish()
         }

@@ -1,22 +1,14 @@
 package GaitVision.com.ui
 
 import android.os.Bundle
-import android.widget.ImageButton
-import androidx.appcompat.app.AppCompatActivity
 import GaitVision.com.R
 
-class HelpActivity : AppCompatActivity() {
+class HelpActivity : BaseActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_help)
 
-        setupBackButton()
-    }
-
-    private fun setupBackButton() {
-        findViewById<ImageButton>(R.id.btnBack).setOnClickListener {
-            finish()
-        }
+        setupCommonHeader("Help/Tutorial")
     }
 }

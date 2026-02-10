@@ -11,39 +11,34 @@ import android.widget.TextView
 import android.widget.VideoView
 import android.widget.Toast
 import android.net.Uri
-import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.PickVisualMediaRequest
 import GaitVision.com.R
 
-class VideoPickerActivity : AppCompatActivity() {
+class VideoPickerActivity : BaseActivity() {
 
     private var selectedVideo: Uri? = null
+
+    private lateinit var videoView: VideoView
+    private lateinit var tvPlaceholder: TextView
+    private lateinit var tvStatus: TextView
+    private lateinit var btnContinue: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_video_picker)
 
-        val videoView = findViewById<VideoView>(R.id.videoView)
-        val tvPlaceholder = findViewById<TextView>(R.id.tvPlaceholder)
-        val tvStatus = findViewById<TextView>(R.id.tvStatus)
-        val btnContinue = findViewById<Button>(R.id.btnContinue)
+        // Initialize view properties
+        videoView = findViewById(R.id.videoView)
+        tvPlaceholder = findViewById(R.id.tvPlaceholder)
+        tvStatus = findViewById(R.id.tvStatus)
+        btnContinue = findViewById(R.id.btnContinue)
 
-        setupBackButton()
+        setupCommonHeader("Select Video")
         setupButtons()
     }
 
-    private fun setupBackButton() {
-        findViewById<ImageButton>(R.id.btnBack).setOnClickListener {
-            finish()
-        }
-    }
-
     private fun setupButtons() {
-        val videoView = findViewById<VideoView>(R.id.videoView)
-        val tvPlaceholder = findViewById<TextView>(R.id.tvPlaceholder)
-        val tvStatus = findViewById<TextView>(R.id.tvStatus)
-        val btnContinue = findViewById<Button>(R.id.btnContinue)
 
         // photo picker api
         val pickVideoLauncher =

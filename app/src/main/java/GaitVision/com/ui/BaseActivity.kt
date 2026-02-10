@@ -1,5 +1,6 @@
 package GaitVision.com.ui
 
+import android.view.View
 import android.widget.ImageButton
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -30,9 +31,14 @@ abstract class BaseActivity : AppCompatActivity() {
         val tvTitle = findViewById<TextView>(R.id.tvTitle)
         tvTitle?.text = title
 
-        if (showBackButton) {
-            btnBack?.setOnClickListener {
-                finish()
+        btnBack?.let { button ->
+            if (showBackButton) {
+                button.visibility = View.VISIBLE
+                button.setOnClickListener {
+                    finish()
+                }
+            } else {
+                button.visibility = View.GONE
             }
         }
     }
@@ -41,8 +47,11 @@ abstract class BaseActivity : AppCompatActivity() {
      * custom back button action
      */
     protected fun setCustomBackAction(action: () -> Unit) {
-        btnBack?.setOnClickListener {
-            action()
+        btnBack?.apply {
+            visibility = View.VISIBLE
+            setOnClickListener {
+                action()
+            }
         }
     }
 }

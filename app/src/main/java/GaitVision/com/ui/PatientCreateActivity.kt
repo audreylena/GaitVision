@@ -45,15 +45,13 @@ class PatientCreateActivity : BaseActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_patient_create)
 
-        // Determine if we're editing an existing patient
-        editingPatientId = intent.getIntExtra("patient_id", -1)
-        val isEditing = editingPatientId != -1
-        setupCommonHeader(if (isEditing) "Edit Patient" else "New Patient")
-
         val database = AppDatabase.getDatabase(this)
         patientDao = database.patientDao()
 
+        // Determine if we're editing an existing patient
         editingPatientId = intent.getLongExtra("patientId", -1).toInt()
+        val isEditing = editingPatientId != -1
+        setupCommonHeader(if (isEditing) "Edit Patient" else "New Patient")
 
         initViews()
         setupSpinners()

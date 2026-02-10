@@ -33,10 +33,14 @@ class QuickAnalysisActivity : BaseActivity() {
     private lateinit var videoPreview: ImageView
     private lateinit var etFeet: EditText
     private lateinit var etInches: EditText
-    private lateinit var participantIdInput: EditText
 
     private val videoPickerLauncher: ActivityResultLauncher<Intent> =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == RESULT_OK) {
+                result.data?.data?.let { uri ->
+                    galleryUri = uri
+                }
+            }
             updateVideoPreview()
         }
 
@@ -79,7 +83,6 @@ class QuickAnalysisActivity : BaseActivity() {
         videoPreview = findViewById(R.id.ivVideoPreview)
         etFeet = findViewById(R.id.etFeet)
         etInches = findViewById(R.id.etInches)
-        participantIdInput = findViewById(R.id.etParticipantId)
         
         // Set default height values
         etFeet.setText("5")
@@ -92,6 +95,7 @@ class QuickAnalysisActivity : BaseActivity() {
             if (validateAndSaveInputs()) {
                 val intent = Intent(this, VideoPickerActivity::class.java)
                 intent.putExtra("mode", "record")
+                intent.putExtra("return_result", true)
                 videoPickerLauncher.launch(intent)
             }
         }
@@ -100,13 +104,16 @@ class QuickAnalysisActivity : BaseActivity() {
             if (validateAndSaveInputs()) {
                 val intent = Intent(this, VideoPickerActivity::class.java)
                 intent.putExtra("mode", "gallery")
+                intent.putExtra("return_result", true)
                 videoPickerLauncher.launch(intent)
             }
         }
 
         findViewById<Button>(R.id.btnAnalyze).setOnClickListener {
             if (validateForAnalysis()) {
-                startActivity(Intent(this, AnalysisActivity::class.java))
+                startActivity(Intent(this, AnalysisActivity::class.java).apply {
+                    putExtra("should_save", false)
+                })
             }
         }
 
@@ -116,13 +123,6 @@ class QuickAnalysisActivity : BaseActivity() {
     }
 
     private fun validateAndSaveInputs(): Boolean {
-        val id = participantIdInput.text.toString().trim()
-        if (id.isEmpty()) {
-            participantIdInput.error = "Participant ID is required"
-            participantIdInput.requestFocus()
-            return false
-        }
-
         // Validate feet and inches using same logic as PatientCreateActivity
         for ((editText, name, max) in listOf(
             Triple(etFeet, "Feet", 8),
@@ -147,7 +147,7 @@ class QuickAnalysisActivity : BaseActivity() {
         val inches = etInches.text.toString().trim().toInt()
         val heightInInches = (feet * 12) + inches
 
-        participantId = id.toInt()
+        participantId = 0 // Dummy ID for quick analysis
         participantHeight = heightInInches
 
         return true

@@ -87,10 +87,18 @@ class VideoPickerActivity : BaseActivity() {
 
         btnContinue.setOnClickListener {
             selectedVideo?.let { uri ->
-                val intent = Intent(this, AnalysisActivity::class.java).apply {
-                    data = uri
+                if (intent.getBooleanExtra("return_result", false)) {
+                    val resultIntent = Intent().apply {
+                        data = uri
+                    }
+                    setResult(RESULT_OK, resultIntent)
+                    finish()
+                } else {
+                    val intent = Intent(this, AnalysisActivity::class.java).apply {
+                        data = uri
+                    }
+                    startActivity(intent)
                 }
-                startActivity(intent)
             } ?: run {
                 Toast.makeText(this, "Please select a video first", Toast.LENGTH_SHORT).show()
             }

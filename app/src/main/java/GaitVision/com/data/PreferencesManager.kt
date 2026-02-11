@@ -13,14 +13,14 @@ class PreferencesManager(context: Context) {
     }
 
     var language: String
-        get() = sharedPreferences.getString(KEY_LANGUAGE, "English") ?: "English"
+        get() = sharedPreferences.getString(KEY_LANGUAGE, "English")!!
         set(value) = sharedPreferences.edit().putString(KEY_LANGUAGE, value).apply()
 
     var theme: String
-        get() = sharedPreferences.getString(KEY_THEME, "Dark") ?: "Dark"
+        get() = sharedPreferences.getString(KEY_THEME, "Dark")!!
         set(value) = sharedPreferences.edit().putString(KEY_THEME, value).apply()
 
     var userName: String
-        get() = sharedPreferences.getString(KEY_USER_NAME, "") ?: ""
+        get() = sharedPreferences.getString(KEY_USER_NAME, "")!!
         set(value) = sharedPreferences.edit().putString(KEY_USER_NAME, value).apply()
 }

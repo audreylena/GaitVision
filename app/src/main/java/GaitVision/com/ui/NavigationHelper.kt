@@ -36,31 +36,19 @@ object NavigationHelper {
             }
         }
 
-        navHelp.setOnClickListener {
-            if (activity !is HelpActivity) {
-                activity.startActivity(Intent(activity, HelpActivity::class.java))
-                activity.overridePendingTransition(0, 0)
-                // Don't finish dashboard if navigating away, but finish others to keep stack clean?
-                // For simple nav:
-                if (activity !is DashboardActivity) activity.finish()
-            }
-        }
-
-        navInfo.setOnClickListener {
-            if (activity !is InfoActivity) {
-                activity.startActivity(Intent(activity, InfoActivity::class.java))
+        val navigateTo = { targetActivityClass: Class<out Activity> ->
+            if (activity.javaClass != targetActivityClass) {
+                activity.startActivity(Intent(activity, targetActivityClass))
                 activity.overridePendingTransition(0, 0)
                 if (activity !is DashboardActivity) activity.finish()
             }
         }
 
-        navSettings.setOnClickListener {
-            if (activity !is SettingsActivity) {
-                activity.startActivity(Intent(activity, SettingsActivity::class.java))
-                activity.overridePendingTransition(0, 0)
-                if (activity !is DashboardActivity) activity.finish()
-            }
-        }
+        navHelp.setOnClickListener { navigateTo(HelpActivity::class.java) }
+
+        navInfo.setOnClickListener { navigateTo(InfoActivity::class.java) }
+
+        navSettings.setOnClickListener { navigateTo(SettingsActivity::class.java) }
     }
 
     private fun highlightTab(activity: Activity, iconId: Int, textId: Int) {

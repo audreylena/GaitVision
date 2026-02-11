@@ -15,6 +15,17 @@ object GaitCsvExporter {
     
     private const val TAG = "GaitCsvExporter"
 
+    /** Sanitize a value for safe CSV output (prevents formula injection in Excel/Sheets). */
+    private fun sanitize(value: String): String {
+        val needsQuoting = value.any { it == ',' || it == '"' || it == '\n' || it == '\r' }
+        val startsWithFormula = value.firstOrNull()?.let { it == '=' || it == '+' || it == '-' || it == '@' } ?: false
+        return when {
+            startsWithFormula -> "\"'${value.replace("\"", "\"\"")}\""
+            needsQuoting -> "\"${value.replace("\"", "\"\"")}\""
+            else -> value
+        }
+    }
+
     /** Generate a suggested filename for the CSV export. */
     fun generateFilename(participantId: String): String {
         val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
@@ -70,12 +81,12 @@ object GaitCsvExporter {
                 // Data row
                 val values = mutableListOf<String>()
                 
-                // Metadata
-                values.add(participantId)
-                values.add(videoName)
+                // Metadata (sanitize user-controlled strings to prevent CSV injection)
+                values.add(sanitize(participantId))
+                values.add(sanitize(videoName))
                 values.add(timestamp)
                 values.add(diagnostics.qualityFlag.name)
-                values.add(diagnostics.walkingDirection)
+                values.add(sanitize(diagnostics.walkingDirection))
                 values.add(diagnostics.wasFlipped.toString())
                 values.add(diagnostics.fpsDetected.toString())
                 values.add(diagnostics.durationS.toString())

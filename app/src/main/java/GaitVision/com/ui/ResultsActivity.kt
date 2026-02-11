@@ -2,11 +2,13 @@ package GaitVision.com.ui
 
 import android.app.AlertDialog
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -35,6 +37,11 @@ class ResultsActivity : BaseActivity() {
 
     private var calculatedScore: Double = 0.0
     private var resultId: Long = -1L
+
+    /** SAF file picker for CSV export -- user chooses save location */
+    private val csvExportLauncher = registerForActivityResult(
+        ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri -> uri?.let { writeCsvToUri(it) } }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -251,6 +258,11 @@ class ResultsActivity : BaseActivity() {
     }
 
     private fun exportCsvFiles() {
+        if (extractionDiagnostics == null) {
+            Toast.makeText(this, "Nothing to export", Toast.LENGTH_SHORT).show()
+            return
+        }
+
         val filePrefix = if (participantId == 0) {
             val timestamp = java.text.SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", java.util.Locale.US).format(java.util.Date())
             "${timestamp}_0"
@@ -258,38 +270,33 @@ class ResultsActivity : BaseActivity() {
             participantId.toString()
         }
 
-        try {
-            val exported = mutableListOf<String>()
+        val filename = GaitCsvExporter.generateFilename(filePrefix)
+        csvExportLauncher.launch(filename)
+    }
 
-            val diagnostics = extractionDiagnostics
-            if (diagnostics != null) {
-                val videoName = galleryUri?.lastPathSegment
-                    ?: diagnostics.videoId.takeIf { it.isNotBlank() }
-                    ?: "unknown"
-                val csvPath = GaitCsvExporter.exportToCSV(
-                    context = this,
+    private fun writeCsvToUri(uri: Uri) {
+        try {
+            val diagnostics = extractionDiagnostics ?: return
+            val videoName = galleryUri?.lastPathSegment
+                ?: diagnostics.videoId.takeIf { it.isNotBlank() }
+                ?: "unknown"
+            val filePrefix = if (participantId == 0) "0" else participantId.toString()
+
+            contentResolver.openOutputStream(uri)?.use { stream ->
+                val success = GaitCsvExporter.writeToStream(
+                    outputStream = stream,
                     features = extractedFeatures,
                     diagnostics = diagnostics,
                     score = scoringResult,
                     participantId = filePrefix,
                     videoName = videoName
                 )
-                if (csvPath != null) {
-                    exported.add("Features CSV saved to Documents")
+                if (success) {
+                    Toast.makeText(this, "CSV exported successfully", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this, "Failed to write CSV", Toast.LENGTH_SHORT).show()
                 }
-            }
-
-            if (exported.isEmpty()) {
-                Toast.makeText(this, "Nothing to export", Toast.LENGTH_SHORT).show()
-                return
-            }
-
-            AlertDialog.Builder(this)
-                .setTitle("Export Successful")
-                .setMessage(exported.joinToString("\n"))
-                .setPositiveButton("OK", null)
-                .show()
-
+            } ?: Toast.makeText(this, "Could not open file for writing", Toast.LENGTH_SHORT).show()
         } catch (e: Exception) {
             Log.e("ResultsActivity", "Error exporting: ${e.message}", e)
             Toast.makeText(this, "Error exporting: ${e.message}", Toast.LENGTH_LONG).show()

@@ -1,43 +1,42 @@
 package GaitVision.com.gait
 
-import android.content.Context
-import android.media.MediaScannerConnection
-import android.os.Environment
 import android.util.Log
-import java.io.File
-import java.io.FileWriter
+import java.io.OutputStream
+import java.io.OutputStreamWriter
 import java.text.SimpleDateFormat
 import java.util.*
 
 /**
  * CSV export utility for gait analysis results.
  * Exports in PC pipeline compatible format.
+ * Uses OutputStream so callers can write to any destination (SAF, file, etc.)
  */
 object GaitCsvExporter {
     
     private const val TAG = "GaitCsvExporter"
-    
+
+    /** Generate a suggested filename for the CSV export. */
+    fun generateFilename(participantId: String): String {
+        val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+        return "${participantId}_gait_${timestamp}.csv"
+    }
+
     /**
-     * Export gait features and diagnostics to CSV.
-     * Returns the file path of the exported CSV.
+     * Write gait features and diagnostics as CSV to the given OutputStream.
+     * Returns true on success.
      */
-    fun exportToCSV(
-        context: Context,
+    fun writeToStream(
+        outputStream: OutputStream,
         features: GaitFeatures?,
         diagnostics: GaitDiagnostics,
         score: ScoringResult?,
         participantId: String,
         videoName: String
-    ): String? {
-        try {
+    ): Boolean {
+        return try {
             val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-            val filename = "${participantId}_gait_${timestamp}.csv"
-            
-            val fileDirectory = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
-            if (!fileDirectory.exists()) fileDirectory.mkdirs()
-            val file = File(fileDirectory, filename)
-            
-            FileWriter(file).use { writer ->
+
+            OutputStreamWriter(outputStream).use { writer ->
                 // Header row
                 val headers = mutableListOf(
                     "participant_id",
@@ -109,15 +108,11 @@ object GaitCsvExporter {
                 writer.write("\n")
             }
             
-            // Scan so it shows up in file browsers
-            MediaScannerConnection.scanFile(context, arrayOf(file.absolutePath), null, null)
-            
-            Log.d(TAG, "Exported CSV to: ${file.absolutePath}")
-            return file.absolutePath
-            
+            Log.d(TAG, "CSV written successfully")
+            true
         } catch (e: Exception) {
-            Log.e(TAG, "Error exporting CSV", e)
-            return null
+            Log.e(TAG, "Error writing CSV", e)
+            false
         }
     }
     

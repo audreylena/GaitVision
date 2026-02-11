@@ -13,20 +13,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import GaitVision.com.R
 import GaitVision.com.galleryUri
-import GaitVision.com.editedUri
-import GaitVision.com.frameList
 import GaitVision.com.participantId
 import GaitVision.com.participantHeight
-import GaitVision.com.currentPatientId
-import GaitVision.com.currentVideoId
-import GaitVision.com.poseFrames
-import GaitVision.com.extractedFeatures
-import GaitVision.com.extractionDiagnostics
-import GaitVision.com.scoringResult
-import GaitVision.com.extractedSignals
-import GaitVision.com.extractedStrides
-import GaitVision.com.selectedStrideIndices
-import GaitVision.com.stepSignalMode
+import GaitVision.com.resetAnalysisState
 
 class QuickAnalysisActivity : BaseActivity() {
 
@@ -61,22 +50,7 @@ class QuickAnalysisActivity : BaseActivity() {
     }
 
     private fun resetGlobalState() {
-        galleryUri = null
-        editedUri = null
-        frameList.clear()
-        participantId = 0
-        participantHeight = 0
-        currentPatientId = null
-        currentVideoId = null
-
-        poseFrames.clear()
-        extractedFeatures = null
-        extractionDiagnostics = null
-        scoringResult = null
-        extractedSignals = null
-        extractedStrides = null
-        selectedStrideIndices = null
-        stepSignalMode = null
+        resetAnalysisState()
     }
 
     private fun initializeViews() {

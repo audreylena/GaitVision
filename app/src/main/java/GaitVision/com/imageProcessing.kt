@@ -593,7 +593,7 @@ suspend fun ProcVidEmpty(context: Context, outputPath: String, activity: AppComp
         return null
     }
 
-    val frameDurationUs = 1000000L / fps.toLong()
+    val frameDurationUs = (1000000.0 / fps).toLong()
     val encoderState = EncoderState(encoder, mediaMuxer, inputSurface, frameDurationUs = frameDurationUs)
     val decoderBufferInfo = MediaCodec.BufferInfo()
     var frameIndex = 0
@@ -691,6 +691,12 @@ suspend fun ProcVidEmpty(context: Context, outputPath: String, activity: AppComp
     
     // Feature extraction (uses poseFrames which is small)
     extractGaitFeatures(context, width, height, frameIndex, activity)
+    
+    // Free heavy memory now that processing is done
+    val frameCount = poseFrames.size
+    frameList.clear()
+    poseFrames.clear()
+    Log.d(TAG, "Cleared frameList and poseFrames ($frameCount poses freed)")
     
     Log.d(TAG, "Pipeline complete")
 

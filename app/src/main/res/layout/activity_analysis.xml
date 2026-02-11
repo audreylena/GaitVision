@@ -189,13 +189,19 @@
         android:padding="16dp"
         android:visibility="gone">
 
-        <Button
-            android:id="@+id/btnSelectAngle"
+        <TextView
+            android:id="@+id/tvChartLabel"
             android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:text="All Angles"
-            android:textColor="@color/white"
-            android:backgroundTint="#424242"
+            android:layout_height="wrap_content"
+            android:text="Stride Signal"
+            android:textColor="#999999"
+            android:textSize="12sp"
+            android:layout_marginBottom="4dp" />
+
+        <com.github.mikephil.charting.charts.LineChart
+            android:id="@+id/strideChart"
+            android:layout_width="match_parent"
+            android:layout_height="160dp"
             android:layout_marginBottom="8dp" />
 
         <LinearLayout

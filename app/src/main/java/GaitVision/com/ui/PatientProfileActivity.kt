@@ -15,6 +15,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import GaitVision.com.R
@@ -32,8 +33,7 @@ import java.util.*
 class PatientProfileActivity : BaseActivity() {
 
     private lateinit var patientDao: PatientDao
-    private lateinit var videoDao: VideoDao
-    private lateinit var gaitScoreDao: GaitScoreDao
+    private lateinit var analysisResultDao: AnalysisResultDao
     
     private lateinit var tvPatientId: TextView
     private lateinit var tvPatientName: TextView
@@ -63,13 +63,12 @@ class PatientProfileActivity : BaseActivity() {
 
         val database = AppDatabase.getDatabase(this)
         patientDao = database.patientDao()
-        videoDao = database.videoDao()
-        gaitScoreDao = database.gaitScoreDao()
+        analysisResultDao = database.analysisResultDao()
 
         setupCommonHeader("Patient Profile")
         initViews()
         setupRecyclerView()
-        loadPatientData()
+        // Data is loaded in onResume (which fires after onCreate), no need to double-load here
     }
 
     private fun initViews() {
@@ -101,13 +100,10 @@ class PatientProfileActivity : BaseActivity() {
 
     private fun setupRecyclerView() {
         adapter = AnalysisAdapter(
-            onViewVideo = { video ->
-                // TODO: Open video player
-                Toast.makeText(this, "Video: ${video.editedVideoPath}", Toast.LENGTH_SHORT).show()
-            },
-            onViewCharts = { video, score ->
-                // TODO: Open results activity with this specific analysis
-                Toast.makeText(this, "Score: ${score?.overallScore}", Toast.LENGTH_SHORT).show()
+            onViewResults = { result ->
+                val intent = Intent(this, ResultsActivity::class.java)
+                intent.putExtra(ResultsActivity.EXTRA_RESULT_ID, result.id)
+                startActivity(intent)
             }
         )
         rvAnalyses.layoutManager = LinearLayoutManager(this)
@@ -131,17 +127,10 @@ class PatientProfileActivity : BaseActivity() {
             currentPatient = patient
             displayPatientInfo(patient)
 
-            // Load videos and scores
-            videoDao.getVideosByPatientIdOrdered(patientIdArg).collectLatest { videos ->
-                val analysisData = withContext(Dispatchers.IO) {
-                    videos.map { video ->
-                        val score = gaitScoreDao.getGaitScoreByVideoId(video.id)
-                        Pair(video, score)
-                    }
-                }
-
-                updateAnalysisList(analysisData)
-                updateStats(analysisData)
+            // Load analysis results
+            analysisResultDao.getResultsByPatientIdOrdered(patientIdArg).collectLatest { results ->
+                updateAnalysisList(results)
+                updateStats(results)
             }
         }
     }
@@ -160,7 +149,7 @@ class PatientProfileActivity : BaseActivity() {
         tvCreatedAt.text = "Added: ${dateFormat.format(Date(patient.createdAt))}"
     }
 
-    private fun updateAnalysisList(analyses: List<Pair<Video, GaitScore?>>) {
+    private fun updateAnalysisList(analyses: List<AnalysisResult>) {
         if (analyses.isEmpty()) {
             rvAnalyses.visibility = View.GONE
             emptyAnalysisState.visibility = View.VISIBLE
@@ -171,10 +160,10 @@ class PatientProfileActivity : BaseActivity() {
         }
     }
 
-    private fun updateStats(analyses: List<Pair<Video, GaitScore?>>) {
+    private fun updateStats(analyses: List<AnalysisResult>) {
         tvTotalAnalyses.text = analyses.size.toString()
         
-        val scores = analyses.mapNotNull { it.second?.overallScore }
+        val scores = analyses.mapNotNull { it.overallScore }
         if (scores.isNotEmpty()) {
             val avgScore = scores.average().toInt()
             tvAvgScore.text = avgScore.toString()
@@ -185,7 +174,7 @@ class PatientProfileActivity : BaseActivity() {
 
     private fun startNewAnalysis() {
         currentPatient?.let { patient ->
-            participantId = patient.participantId ?: 0 ?: 0
+            participantId = patient.participantId ?: 0
             participantHeight = patient.height
             currentPatientId = patient.participantId
 
@@ -225,16 +214,23 @@ class PatientProfileActivity : BaseActivity() {
 
 // Analysis Adapter
 class AnalysisAdapter(
-    private val onViewVideo: (Video) -> Unit,
-    private val onViewCharts: (Video, GaitScore?) -> Unit
+    private val onViewResults: (AnalysisResult) -> Unit
 ) : RecyclerView.Adapter<AnalysisAdapter.AnalysisViewHolder>() {
 
-    private var analyses: List<Pair<Video, GaitScore?>> = emptyList()
+    private var analyses: List<AnalysisResult> = emptyList()
     private val dateFormat = SimpleDateFormat("MMM d, yyyy • h:mm a", Locale.getDefault())
 
-    fun submitList(newAnalyses: List<Pair<Video, GaitScore?>>) {
+    fun submitList(newAnalyses: List<AnalysisResult>) {
+        val oldList = analyses
         analyses = newAnalyses
-        notifyDataSetChanged()
+        DiffUtil.calculateDiff(object : DiffUtil.Callback() {
+            override fun getOldListSize() = oldList.size
+            override fun getNewListSize() = newAnalyses.size
+            override fun areItemsTheSame(oldPos: Int, newPos: Int) =
+                oldList[oldPos].id == newAnalyses[newPos].id
+            override fun areContentsTheSame(oldPos: Int, newPos: Int) =
+                oldList[oldPos] == newAnalyses[newPos]
+        }).dispatchUpdatesTo(this)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): AnalysisViewHolder {
@@ -258,29 +254,27 @@ class AnalysisAdapter(
         private val tvLeftHip: TextView = itemView.findViewById(R.id.tvLeftHip)
         private val tvRightHip: TextView = itemView.findViewById(R.id.tvRightHip)
         private val tvTorso: TextView = itemView.findViewById(R.id.tvTorso)
-        private val btnViewVideo: Button = itemView.findViewById(R.id.btnViewVideo)
-        private val btnViewCharts: Button = itemView.findViewById(R.id.btnViewCharts)
+        private val btnViewResults: Button = itemView.findViewById(R.id.btnViewCharts)
 
-        fun bind(data: Pair<Video, GaitScore?>) {
-            val (video, score) = data
+        fun bind(result: AnalysisResult) {
+            tvDate.text = dateFormat.format(Date(result.recordedAt))
 
-            tvDate.text = dateFormat.format(Date(video.recordedAt))
-
+            val score = result.overallScore
             if (score != null) {
-                tvScore.text = score.overallScore.toInt().toString()
+                tvScore.text = score.toInt().toString()
                 scoreContainer.setBackgroundResource(
                     when {
-                        score.overallScore >= 80 -> R.drawable.score_badge_background // Green
-                        score.overallScore >= 60 -> R.drawable.badge_background // Yellow-ish
-                        else -> R.drawable.button_outline_background // Red-ish
+                        score >= 80 -> R.drawable.score_badge_background
+                        score >= 60 -> R.drawable.badge_background
+                        else -> R.drawable.button_outline_background
                     }
                 )
                 
-                tvLeftKnee.text = score.leftKneeScore?.let { "${it.toInt()}°" } ?: "—"
-                tvRightKnee.text = score.rightKneeScore?.let { "${it.toInt()}°" } ?: "—"
-                tvLeftHip.text = score.leftHipScore?.let { "${it.toInt()}°" } ?: "—"
-                tvRightHip.text = score.rightHipScore?.let { "${it.toInt()}°" } ?: "—"
-                tvTorso.text = score.torsoScore?.let { "${it.toInt()}°" } ?: "—"
+                tvLeftKnee.text = result.kneeLeftRom?.let { "${it.toInt()}°" } ?: "—"
+                tvRightKnee.text = result.kneeRightRom?.let { "${it.toInt()}°" } ?: "—"
+                tvLeftHip.text = result.ldjHip?.let { String.format("%.2f", it) } ?: "—"
+                tvRightHip.text = "—"
+                tvTorso.text = result.trunkLeanStdDeg?.let { "${it.toInt()}°" } ?: "—"
             } else {
                 tvScore.text = "—"
                 tvLeftKnee.text = "—"
@@ -290,8 +284,7 @@ class AnalysisAdapter(
                 tvTorso.text = "—"
             }
 
-            btnViewVideo.setOnClickListener { onViewVideo(video) }
-            btnViewCharts.setOnClickListener { onViewCharts(video, score) }
+            btnViewResults.setOnClickListener { onViewResults(result) }
         }
     }
 }

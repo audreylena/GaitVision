@@ -20,18 +20,18 @@ import GaitVision.com.R
 import GaitVision.com.data.AppDatabase
 import GaitVision.com.data.Patient
 import GaitVision.com.data.PatientDao
-import GaitVision.com.data.VideoDao
+import GaitVision.com.data.AnalysisResultDao
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.runBlocking
+import androidx.recyclerview.widget.DiffUtil
 
 
 class PatientListActivity : BaseActivity() {
 
     private lateinit var patientDao: PatientDao
-    private lateinit var videoDao: VideoDao
+    private lateinit var analysisResultDao: AnalysisResultDao
     private lateinit var adapter: PatientAdapter
     private lateinit var rvPatients: RecyclerView
     private lateinit var emptyState: View
@@ -57,7 +57,7 @@ class PatientListActivity : BaseActivity() {
 
         val database = AppDatabase.getDatabase(this)
         patientDao = database.patientDao()
-        videoDao = database.videoDao()
+        analysisResultDao = database.analysisResultDao()
 
         initViews()
         setupRecyclerView()
@@ -96,11 +96,6 @@ class PatientListActivity : BaseActivity() {
                     startActivity(intent)
                 } ?: run {
                     Toast.makeText(this, "Invalid patient ID", Toast.LENGTH_SHORT).show()
-                }
-            },
-            getVideoCount = { patientId ->
-                 runBlocking(Dispatchers.IO) {
-                 videoDao.getVideoCountForPatient(patientId ?: 0)
                 }
             }
         )
@@ -219,6 +214,11 @@ class PatientListActivity : BaseActivity() {
 
     private fun filterPatients(query: String) {
         lifecycleScope.launch {
+            // Single bulk query for all video counts (replaces N+1 per-patient queries)
+            val videoCounts: Map<Int, Int> = withContext(Dispatchers.IO) {
+                analysisResultDao.getAllResultCounts()
+            }.associate { it.patientId to it.count }
+
             var filtered = allPatients
 
             // Apply search filter
@@ -238,11 +238,7 @@ class PatientListActivity : BaseActivity() {
                     filtered = filtered.filter { it.createdAt >= oneWeekAgo }
                 }
                 "videos" -> {
-                    filtered = withContext(Dispatchers.IO) {
-                        filtered.filter {
-                            videoDao.getVideoCountForPatient(it.participantId ?: 0) > 0
-                        }
-                    }
+                    filtered = filtered.filter { (videoCounts[it.participantId ?: 0] ?: 0) > 0 }
                 }
             }
 
@@ -253,17 +249,14 @@ class PatientListActivity : BaseActivity() {
                 "lastName" -> if (currentSortOrder) filtered.sortedBy { it.lastName.lowercase() } else filtered.sortedByDescending { it.lastName.lowercase() }
                 "age" -> if (currentSortOrder) filtered.sortedBy { it.age } else filtered.sortedByDescending { it.age }
                 "videos" -> {
-                    val patientVideoCounts = withContext(Dispatchers.IO) {
-                        filtered.associateWith { videoDao.getVideoCountForPatient(it.participantId ?: 0) }
-                    }
-                    if (currentSortOrder) patientVideoCounts.entries.sortedBy { it.value }.map { it.key }
-                    else patientVideoCounts.entries.sortedByDescending { it.value }.map { it.key }
+                    if (currentSortOrder) filtered.sortedBy { videoCounts[it.participantId ?: 0] ?: 0 }
+                    else filtered.sortedByDescending { videoCounts[it.participantId ?: 0] ?: 0 }
                 }
-                else -> filtered // Default or fallback
+                else -> filtered
             }
 
             // Update UI
-            adapter.submitList(filtered)
+            adapter.submitList(filtered, videoCounts)
             tvPatientCount.text = "${filtered.size} patient${if (filtered.size != 1) "s" else ""}"
 
             if (filtered.isEmpty()) {
@@ -287,16 +280,24 @@ class PatientListActivity : BaseActivity() {
 
 // Patient Adapter
 class PatientAdapter(
-    private val onPatientClick: (Patient) -> Unit,
-    private val getVideoCount: (Int?) -> Int
+    private val onPatientClick: (Patient) -> Unit
 ) : RecyclerView.Adapter<PatientAdapter.PatientViewHolder>() {
 
     private var patients: List<Patient> = emptyList()
-    private val videoCounts = mutableMapOf<Int?, Int>()
+    private var videoCounts: Map<Int, Int> = emptyMap()
 
-    fun submitList(newPatients: List<Patient>) {
+    fun submitList(newPatients: List<Patient>, counts: Map<Int, Int> = emptyMap()) {
+        val oldList = patients
         patients = newPatients
-        notifyDataSetChanged()
+        videoCounts = counts
+        DiffUtil.calculateDiff(object : DiffUtil.Callback() {
+            override fun getOldListSize() = oldList.size
+            override fun getNewListSize() = newPatients.size
+            override fun areItemsTheSame(oldPos: Int, newPos: Int) =
+                oldList[oldPos].participantId == newPatients[newPos].participantId
+            override fun areContentsTheSame(oldPos: Int, newPos: Int) =
+                oldList[oldPos] == newPatients[newPos]
+        }).dispatchUpdatesTo(this)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PatientViewHolder {
@@ -318,18 +319,17 @@ class PatientAdapter(
         private val tvPatientAge: TextView = itemView.findViewById(R.id.tvPatientAge)
         private val tvVideoCount: TextView = itemView.findViewById(R.id.tvVideoCount)
 
-   fun bind(patient: Patient) {
-        tvPatientId.text = patient.participantId?.toString() ?: "N/A"
-        tvPatientFirstName.text = patient.firstName
-        tvPatientLastName.text = patient.lastName
-        tvPatientAge.text = patient.age?.toString() ?: "—"
+        fun bind(patient: Patient) {
+            tvPatientId.text = patient.participantId?.toString() ?: "N/A"
+            tvPatientFirstName.text = patient.firstName
+            tvPatientLastName.text = patient.lastName
+            tvPatientAge.text = patient.age?.toString() ?: "—"
 
-        val count = patient.participantId?.let { getVideoCount(it) } ?: 0
-        tvVideoCount.text = count.toString()
+            val count = videoCounts[patient.participantId ?: 0] ?: 0
+            tvVideoCount.text = count.toString()
 
-        itemView.setOnClickListener { onPatientClick(patient) }
-}
-
+            itemView.setOnClickListener { onPatientClick(patient) }
+        }
     }
 }
 

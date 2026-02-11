@@ -33,7 +33,9 @@ object GaitCsvExporter {
             val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
             val filename = "${participantId}_gait_${timestamp}.csv"
             
-            val file = File(context.getExternalFilesDir(null), filename)
+            val fileDirectory = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
+            if (!fileDirectory.exists()) fileDirectory.mkdirs()
+            val file = File(fileDirectory, filename)
             
             FileWriter(file).use { writer ->
                 // Header row
@@ -107,66 +109,14 @@ object GaitCsvExporter {
                 writer.write("\n")
             }
             
+            // Scan so it shows up in file browsers
+            MediaScannerConnection.scanFile(context, arrayOf(file.absolutePath), null, null)
+            
             Log.d(TAG, "Exported CSV to: ${file.absolutePath}")
             return file.absolutePath
             
         } catch (e: Exception) {
             Log.e(TAG, "Error exporting CSV", e)
-            return null
-        }
-    }
-    
-    /**
-     * Export per-frame signals to CSV (for debugging/visualization).
-     * Includes all computed signals matching PC dashboard.
-     */
-    fun exportSignalsToCSV(
-        context: Context,
-        signals: Signals,
-        participantId: String
-    ): String? {
-        try {
-            val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-            val filename = "${participantId}_signals_${timestamp}.csv"
-            
-            val fileDirectory = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
-            val file = File(fileDirectory, filename)
-            
-            FileWriter(file).use { writer ->
-                // Header - all signals
-                writer.write("frame_idx,timestamp_s,is_valid,inter_ankle_dist,knee_angle_left,knee_angle_right,trunk_angle,ankle_left_y,ankle_right_y,hip_left_y,hip_right_y,ankle_left_vy,ankle_right_vy,hip_avg_vy\n")
-                
-                // Data rows
-                for (i in signals.frameIndices.indices) {
-                    val row = listOf(
-                        signals.frameIndices[i].toString(),
-                        formatFloat(signals.timestamps[i]),
-                        signals.isValid[i].toString(),
-                        formatFloat(signals.interAnkleDist[i]),
-                        formatFloat(signals.kneeAngleLeft[i]),
-                        formatFloat(signals.kneeAngleRight[i]),
-                        formatFloat(signals.trunkAngle[i]),
-                        formatFloat(signals.ankleLeftY[i]),
-                        formatFloat(signals.ankleRightY[i]),
-                        formatFloat(signals.hipLeftY[i]),
-                        formatFloat(signals.hipRightY[i]),
-                        formatFloat(signals.ankleLeftVy[i]),
-                        formatFloat(signals.ankleRightVy[i]),
-                        formatFloat(signals.hipAvgVy[i])
-                    )
-                    writer.write(row.joinToString(","))
-                    writer.write("\n")
-                }
-            }
-            
-            // Scan so it shows up in file browsers
-            MediaScannerConnection.scanFile(context, arrayOf(file.absolutePath), null, null)
-            
-            Log.d(TAG, "Exported signals CSV to: ${file.absolutePath}")
-            return file.absolutePath
-            
-        } catch (e: Exception) {
-            Log.e(TAG, "Error exporting signals CSV", e)
             return null
         }
     }
@@ -226,9 +176,5 @@ object GaitCsvExporter {
         }
         
         return sb.toString()
-    }
-    
-    private fun formatFloat(value: Float): String {
-        return if (value.isNaN()) "NaN" else "%.4f".format(value)
     }
 }

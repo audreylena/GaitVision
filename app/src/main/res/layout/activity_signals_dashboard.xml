@@ -185,16 +185,5 @@
         android:gravity="center"
         android:layout_marginBottom="8dp" />
 
-    <!-- Export Button -->
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/btnExportSignals"
-        android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:layout_marginHorizontal="16dp"
-        android:layout_marginBottom="16dp"
-        android:text="Export Signals CSV"
-        android:textSize="14sp"
-        android:textColor="@color/white"
-        android:backgroundTint="#2196F3" />
 
 </LinearLayout>

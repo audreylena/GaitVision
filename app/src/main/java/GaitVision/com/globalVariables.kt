@@ -34,7 +34,7 @@ var participantHeight: Int = 0
 
 //Database IDs for current session
 var currentPatientId: Int? = null
-var currentVideoId: Long? = null
+var currentResultId: Long? = null
 
 
 //Variable for keeping track of video length we processed on
@@ -47,3 +47,23 @@ var forceCpuInference: Boolean = true  // Force CPU inference for parity with PC
 
 // Debug/logging options
 var enableVerboseLogging: Boolean = false  // Toggle heavy per-frame logging in FeatureExtractor
+
+/** Reset all session state. Call when returning to Dashboard or starting a fresh analysis. */
+fun resetAnalysisState() {
+    galleryUri = null
+    editedUri = null
+    frameList.clear()
+    poseFrames.clear()
+    extractedFeatures = null
+    extractionDiagnostics = null
+    scoringResult = null
+    extractedSignals = null
+    extractedStrides = null
+    selectedStrideIndices = null
+    stepSignalMode = null
+    participantId = 0
+    participantHeight = 0
+    currentPatientId = null
+    currentResultId = null
+    videoLength = 0
+}

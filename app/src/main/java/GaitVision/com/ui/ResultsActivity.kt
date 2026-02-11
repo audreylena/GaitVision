@@ -351,10 +351,6 @@ class ResultsActivity : BaseActivity() {
                     features = extractedFeatures,
                     diagnostics = diagnostics,
                     score = scoringResult,
-                    context = this,
-                    features = extractedFeatures,
-                    diagnostics = diagnostics,
-                    score = scoringResult,
                     participantId = filePrefix, // Use the full prefix (timestamp or ID)
                     videoName = videoName
                 )

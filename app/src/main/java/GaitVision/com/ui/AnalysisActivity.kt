@@ -64,7 +64,7 @@ class AnalysisActivity : BaseActivity() {
         }
 
         // Get intent extras
-        shouldSave = intent.getBooleanExtra(EXTRA_SHOULD_SAVE, false)
+        shouldSave = intent.getBooleanExtra(EXTRA_SHOULD_SAVE, true)
 
         // Get the video URI from VideoPickerActivity
         intent.data?.let { uri ->
@@ -258,7 +258,7 @@ class AnalysisActivity : BaseActivity() {
         findViewById<View>(R.id.videoSection).visibility = View.VISIBLE
         findViewById<View>(R.id.anglesSection).visibility = View.VISIBLE
         
-        findViewById<Button>(R.id.btnViewResults).visibility = if (shouldSave) View.VISIBLE else View.GONE
+        findViewById<Button>(R.id.btnViewResults).visibility = View.VISIBLE
         
         findViewById<Button>(R.id.btnRunAnalysis).visibility = View.GONE
 

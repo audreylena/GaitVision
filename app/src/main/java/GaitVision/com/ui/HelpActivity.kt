@@ -10,5 +10,6 @@ class HelpActivity : BaseActivity() {
         setContentView(R.layout.activity_help)
 
         setupCommonHeader("Help/Tutorial")
+        NavigationHelper.setupBottomNav(this)
     }
 }

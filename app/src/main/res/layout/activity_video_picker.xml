@@ -4,109 +4,116 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#1A1A2E"
-    android:padding="16dp">
+    android:background="#1A1A2E">
 
     <!-- Header -->
     <include layout="@layout/layout_common_header" />
 
-    <!-- Video Preview Card -->
-    <androidx.cardview.widget.CardView
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:layout_marginBottom="16dp"
-        app:cardCornerRadius="12dp"
-        app:cardBackgroundColor="#1A1A1A">
-
-        <FrameLayout
-            android:layout_width="match_parent"
-            android:layout_height="match_parent">
-
-            <VideoView
-                android:id="@+id/videoView"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:layout_gravity="center"
-                android:visibility="gone" />
-
-            <TextView
-                android:id="@+id/tvPlaceholder"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:text="Video preview will appear here"
-                android:textColor="#666666"
-                android:textSize="16sp" />
-
-        </FrameLayout>
-
-    </androidx.cardview.widget.CardView>
-
-    <!-- Status Text -->
-    <TextView
-        android:id="@+id/tvStatus"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Select or record a video"
-        android:textColor="#999999"
-        android:textSize="14sp"
-        android:gravity="center"
-        android:layout_marginBottom="16dp" />
-
-    <!-- Action Buttons -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:layout_marginBottom="12dp">
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:padding="16dp">
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnPick"
-            android:layout_width="0dp"
-            android:layout_height="56dp"
+        <!-- Video Preview Card -->
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
             android:layout_weight="1"
-            android:layout_marginEnd="8dp"
-            android:text="Gallery"
-            android:textSize="14sp"
-            android:textColor="@color/white"
-            android:backgroundTint="#2196F3"
-            app:icon="@drawable/ic_folder_24"
-            app:iconTint="@color/white"
-            app:iconPadding="8dp"
-            app:iconGravity="start" />
+            android:layout_marginBottom="16dp"
+            app:cardCornerRadius="12dp"
+            app:cardBackgroundColor="#1A1A1A">
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnRecord"
-            android:layout_width="0dp"
-            android:layout_height="56dp"
-            android:layout_weight="1"
-            android:layout_marginStart="8dp"
-            android:text="Record"
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent">
+
+                <VideoView
+                    android:id="@+id/videoView"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:layout_gravity="center"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/tvPlaceholder"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:text="Video preview will appear here"
+                    android:textColor="#666666"
+                    android:textSize="16sp" />
+
+            </FrameLayout>
+
+        </androidx.cardview.widget.CardView>
+
+        <!-- Status Text -->
+        <TextView
+            android:id="@+id/tvStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Select or record a video"
+            android:textColor="#999999"
             android:textSize="14sp"
+            android:gravity="center"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Action Buttons -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="12dp">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnPick"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_weight="1"
+                android:layout_marginEnd="8dp"
+                android:text="Gallery"
+                android:textSize="14sp"
+                android:textColor="@color/white"
+                android:backgroundTint="#2196F3"
+                app:icon="@drawable/ic_folder_24"
+                app:iconTint="@color/white"
+                app:iconPadding="8dp"
+                app:iconGravity="start" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnRecord"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:text="Record"
+                android:textSize="14sp"
+                android:textColor="@color/white"
+                android:backgroundTint="#4CAF50"
+                app:icon="@drawable/baseline_videocam_24"
+                app:iconTint="@color/white"
+                app:iconPadding="8dp"
+                app:iconGravity="start" />
+
+        </LinearLayout>
+
+        <!-- Continue Button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnContinue"
+            android:layout_width="match_parent"
+            android:layout_height="64dp"
+            android:text="Use This Video"
+            android:textSize="18sp"
+            android:textStyle="bold"
             android:textColor="@color/white"
-            android:backgroundTint="#4CAF50"
-            app:icon="@drawable/baseline_videocam_24"
+            android:backgroundTint="#9C27B0"
+            app:icon="@drawable/ic_check_24"
             app:iconTint="@color/white"
-            app:iconPadding="8dp"
-            app:iconGravity="start" />
+            app:iconPadding="12dp"
+            app:iconGravity="start"
+            android:visibility="gone" />
 
     </LinearLayout>
-
-    <!-- Continue Button -->
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/btnContinue"
-        android:layout_width="match_parent"
-        android:layout_height="64dp"
-        android:text="Use This Video"
-        android:textSize="18sp"
-        android:textStyle="bold"
-        android:textColor="@color/white"
-        android:backgroundTint="#9C27B0"
-        app:icon="@drawable/ic_check_24"
-        app:iconTint="@color/white"
-        app:iconPadding="12dp"
-        app:iconGravity="start"
-        android:visibility="gone" />
 
 </LinearLayout>

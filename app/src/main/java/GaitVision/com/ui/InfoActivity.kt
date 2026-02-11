@@ -10,5 +10,6 @@ class InfoActivity : BaseActivity() {
         setContentView(R.layout.activity_info)
 
         setupCommonHeader("Info")
+        NavigationHelper.setupBottomNav(this)
     }
 }

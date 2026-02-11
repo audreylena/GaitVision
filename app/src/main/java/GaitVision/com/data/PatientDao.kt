@@ -44,6 +44,9 @@ interface PatientDao {
     @Query("SELECT * FROM patients ORDER BY lastName, firstName")
     fun getPatientsOrderedByName(): Flow<List<Patient>>
 
+    @Query("SELECT * FROM patients ORDER BY lastModifiedAt DESC LIMIT :limit")
+    fun getRecentPatients(limit: Int): Flow<List<Patient>>
+
     @Query("SELECT COALESCE(MAX(participantId), 0) + 1 FROM patients")
     suspend fun getNextPatientId(): Int
 }

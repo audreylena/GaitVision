@@ -15,7 +15,8 @@ data class Patient(
     val age: Int? = null,
     val gender: String? = null,
     val height: Int, // Height in inches
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    val lastModifiedAt: Long = System.currentTimeMillis()
 ) {
     // Full name property for convenience
     val fullName: String

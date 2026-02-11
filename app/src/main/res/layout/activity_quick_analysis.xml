@@ -72,45 +72,6 @@
                 android:textSize="16sp" />
         </LinearLayout>
 
-        <!-- Video Preview -->
-        <FrameLayout
-            android:layout_width="match_parent"
-            android:layout_height="180dp"
-            android:background="@drawable/card_background"
-            android:layout_marginBottom="16dp">
-
-            <ImageView
-                android:id="@+id/ivVideoPreview"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:scaleType="centerCrop"
-                android:contentDescription="Video preview" />
-
-            <LinearLayout
-                android:id="@+id/tvVideoPlaceholder"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:orientation="horizontal"
-                android:gravity="center_vertical">
-
-                <ImageView
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
-                    android:src="@drawable/baseline_videocam_24"
-                    app:tint="#666666"
-                    android:layout_marginEnd="8dp"
-                    android:contentDescription="Video icon" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="No video selected"
-                    android:textColor="#666666"
-                    android:textSize="16sp" />
-            </LinearLayout>
-        </FrameLayout>
-
         <!-- Video Selection Buttons -->
         <LinearLayout
             android:layout_width="match_parent"
@@ -156,16 +117,6 @@
                 app:iconPadding="8dp"
                 app:iconGravity="start" />
         </LinearLayout>
-
-        <!-- Analyze Button -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnAnalyze"
-            style="@style/PrimaryButton"
-            android:text="Run Gait Analysis"
-            app:icon="@drawable/ic_science_24"
-            app:iconTint="@color/white"
-            app:iconPadding="12dp"
-            app:iconGravity="start" />
 
         <!-- View Results Button -->
         <com.google.android.material.button.MaterialButton

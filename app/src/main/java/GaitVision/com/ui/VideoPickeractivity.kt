@@ -6,7 +6,6 @@ import android.provider.MediaStore
 import android.util.Log
 import android.view.View
 import android.widget.Button
-import android.widget.ImageButton
 import android.widget.TextView
 import android.widget.VideoView
 import android.widget.Toast
@@ -24,9 +23,6 @@ class VideoPickerActivity : BaseActivity() {
     private lateinit var tvStatus: TextView
     private lateinit var btnContinue: Button
     
-    companion object {
-        const val EXTRA_RETURN_RESULT = "return_result"
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -91,19 +87,13 @@ class VideoPickerActivity : BaseActivity() {
 
         btnContinue.setOnClickListener {
             selectedVideo?.let { uri ->
-                if (intent.getBooleanExtra(EXTRA_RETURN_RESULT, false)) {
-                    val resultIntent = Intent().apply {
-                        data = uri
-                    }
-                    setResult(RESULT_OK, resultIntent)
-                    finish()
-                } else {
-                    val intent = Intent(this, AnalysisActivity::class.java).apply {
-                        data = uri
-                        putExtra(AnalysisActivity.EXTRA_SHOULD_SAVE, true)
-                    }
-                    startActivity(intent)
+                val shouldSave = intent.getBooleanExtra(AnalysisActivity.EXTRA_SHOULD_SAVE, true)
+                val analysisIntent = Intent(this, AnalysisActivity::class.java).apply {
+                    data = uri
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    putExtra(AnalysisActivity.EXTRA_SHOULD_SAVE, shouldSave)
                 }
+                startActivity(analysisIntent)
             } ?: run {
                 Toast.makeText(this, "Please select a video first", Toast.LENGTH_SHORT).show()
             }

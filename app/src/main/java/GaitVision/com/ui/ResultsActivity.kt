@@ -304,6 +304,15 @@ class ResultsActivity : BaseActivity() {
             Toast.makeText(this, "No signal data to export", Toast.LENGTH_SHORT).show()
             return
         }
+
+        // Generate a timestamp prefix if this is a Quick Analysis (id == 0)
+        // Format: yyyy-MM-dd_HH-mm-ss (Windows-safe)
+        val filePrefix = if (participantId == 0) {
+            val timestamp = java.text.SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", java.util.Locale.US).format(java.util.Date())
+            "${timestamp}_0"
+        } else {
+            participantId.toString()
+        }
         
         // Convert FloatArrays to Lists for export
         val fileData = listOf(
@@ -329,7 +338,7 @@ class ResultsActivity : BaseActivity() {
         try {
             // Export wireframe angle files (for visualization)
             for (i in fileData.indices) {
-                val fileName = "${participantId}_${angleNames[i]}.csv"
+                val fileName = "${filePrefix}_${angleNames[i]}.csv"
                 writeToFile(fileName, fileData[i])
             }
             
@@ -342,7 +351,7 @@ class ResultsActivity : BaseActivity() {
                     features = extractedFeatures,
                     diagnostics = diagnostics,
                     score = scoringResult,
-                    participantId = participantId.toString(),
+                    participantId = filePrefix, // Use the full prefix (timestamp or ID)
                     videoName = videoName
                 )
                 if (csvPath != null) {
@@ -351,15 +360,15 @@ class ResultsActivity : BaseActivity() {
             }
 
             // Rename edited video
-            renameEditedVideo()
+            renameEditedVideo(filePrefix)
 
             // Build export message
             val message = StringBuilder()
-            message.appendLine("CSV files saved to Documents as ${participantId}_GraphName.csv")
+            message.appendLine("CSV files saved to Documents as ${filePrefix}_GraphName.csv")
             if (extractedFeatures != null) {
                 message.appendLine("\nGait features CSV exported with ${extractedFeatures!!.valid_stride_count} valid strides")
             }
-            message.appendLine("\nVideo saved to Movies as ${participantId}_video.mp4")
+            message.appendLine("\nVideo saved to Movies as ${filePrefix}_video.mp4")
 
             AlertDialog.Builder(this)
                 .setTitle("Export Successful")
@@ -387,8 +396,8 @@ class ResultsActivity : BaseActivity() {
         MediaScannerConnection.scanFile(this, arrayOf(outputFile.absolutePath), null, null)
     }
 
-    private fun renameEditedVideo() {
-        val vidName = "${participantId}_video.mp4"
+    private fun renameEditedVideo(filePrefix: String) {
+        val vidName = "${filePrefix}_video.mp4"
         val oldFilePath = File(
             Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES),
             "edited_video.mp4"

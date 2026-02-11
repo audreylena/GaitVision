@@ -15,16 +15,7 @@
         <LinearLayout
             style="@style/ContentContainer">
 
-        <!-- Participant ID Input -->
-        <TextView
-            style="@style/InputLabel"
-            android:text="Participant ID" />
 
-        <EditText
-            android:id="@+id/etParticipantId"
-            style="@style/InputField"
-            android:hint="Enter participant ID"
-            android:inputType="text" />
 
         <!-- Height Selection -->
         <TextView

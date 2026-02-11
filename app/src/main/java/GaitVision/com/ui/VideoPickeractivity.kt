@@ -23,6 +23,10 @@ class VideoPickerActivity : BaseActivity() {
     private lateinit var tvPlaceholder: TextView
     private lateinit var tvStatus: TextView
     private lateinit var btnContinue: Button
+    
+    companion object {
+        const val EXTRA_RETURN_RESULT = "return_result"
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -87,10 +91,19 @@ class VideoPickerActivity : BaseActivity() {
 
         btnContinue.setOnClickListener {
             selectedVideo?.let { uri ->
-                val intent = Intent(this, AnalysisActivity::class.java).apply {
-                    data = uri
+                if (intent.getBooleanExtra(EXTRA_RETURN_RESULT, false)) {
+                    val resultIntent = Intent().apply {
+                        data = uri
+                    }
+                    setResult(RESULT_OK, resultIntent)
+                    finish()
+                } else {
+                    val intent = Intent(this, AnalysisActivity::class.java).apply {
+                        data = uri
+                        putExtra(AnalysisActivity.EXTRA_SHOULD_SAVE, true)
+                    }
+                    startActivity(intent)
                 }
-                startActivity(intent)
             } ?: run {
                 Toast.makeText(this, "Please select a video first", Toast.LENGTH_SHORT).show()
             }

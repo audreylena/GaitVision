@@ -47,6 +47,11 @@ class AnalysisActivity : BaseActivity() {
     private val handler = Handler(Looper.getMainLooper())
     private var updateRunnable: Runnable? = null
     private var isProcessing = false
+    private var shouldSave = true
+
+    companion object {
+        const val EXTRA_SHOULD_SAVE = "should_save"
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -57,6 +62,9 @@ class AnalysisActivity : BaseActivity() {
             updateRunnable?.let { handler.removeCallbacks(it) }
             finish()
         }
+
+        // Get intent extras
+        shouldSave = intent.getBooleanExtra(EXTRA_SHOULD_SAVE, true)
 
         // Get the video URI from VideoPickerActivity
         intent.data?.let { uri ->
@@ -89,7 +97,8 @@ class AnalysisActivity : BaseActivity() {
         findViewById<View>(R.id.infoSection).visibility = View.VISIBLE
 
         // Update participant info
-        findViewById<TextView>(R.id.tvParticipantInfo).text = "Participant: $participantId\nHeight: ${participantHeight / 12}'${participantHeight % 12}\""
+        val participantLabel = if (shouldSave) "Participant: $participantId" else "Quick Analysis"
+        findViewById<TextView>(R.id.tvParticipantInfo).text = "$participantLabel\nHeight: ${participantHeight / 12}'${participantHeight % 12}\""
 
         galleryUri?.let {
             findViewById<TextView>(R.id.tvVideoStatus).text = "Video ready for analysis"
@@ -127,18 +136,25 @@ class AnalysisActivity : BaseActivity() {
 
         lifecycleScope.launch {
             try {
-                // First, create/find patient in database
+                // First, create/find patient in database if saving is enabled
                 val database = AppDatabase.getDatabase(this@AnalysisActivity)
-                val patientRepository = PatientRepository(database.patientDao())
-
-                val patient = withContext(Dispatchers.IO) {
-                    patientRepository.findOrCreatePatientByParticipantId(
-                        participantId = participantId,
-                        height = participantHeight
-                    )
+                
+                if (shouldSave) {
+                    val patientRepository = PatientRepository(database.patientDao())
+                    val patient = withContext(Dispatchers.IO) {
+                        patientRepository.findOrCreatePatientByParticipantId(
+                            participantId = participantId,
+                            height = participantHeight
+                        )
+                    }
+                    currentPatientId = patient.participantId
+                    Log.d("AnalysisActivity", "Patient ID: ${patient.participantId}")
+                } else {
+                    // For quick analysis, we need a dummy patient ID for processing if it uses it internally,
+                    // but looking at saveToDatabase, currentPatientId is only used for saving.
+                    // ProcVidEmpty doesn't seem to use currentPatientId.
+                    Log.d("AnalysisActivity", "Skipping patient creation/lookup (One-off analysis)")
                 }
-                currentPatientId = patient.participantId
-                Log.d("AnalysisActivity", "Patient ID: ${patient.participantId}")
 
                 // Process the video (use app cache dir to avoid permission issues)
                 val outputFilePath = "${cacheDir.absolutePath}/edited_video.mp4"
@@ -179,7 +195,7 @@ class AnalysisActivity : BaseActivity() {
     }
 
     private suspend fun saveToDatabase(database: AppDatabase, outputPath: String) {
-        if (currentPatientId == null || editedUri == null) return
+        if (!shouldSave || currentPatientId == null || editedUri == null) return
 
         try {
             val videoRepository = VideoRepository(database.videoDao())
@@ -241,7 +257,9 @@ class AnalysisActivity : BaseActivity() {
         findViewById<View>(R.id.progressSection).visibility = View.GONE
         findViewById<View>(R.id.videoSection).visibility = View.VISIBLE
         findViewById<View>(R.id.anglesSection).visibility = View.VISIBLE
+        
         findViewById<Button>(R.id.btnViewResults).visibility = View.VISIBLE
+        
         findViewById<Button>(R.id.btnRunAnalysis).visibility = View.GONE
 
         editedUri?.let { uri ->

@@ -2,53 +2,46 @@ package GaitVision.com.ui
 
 import android.app.AlertDialog
 import android.content.Intent
-import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Bundle
-import android.os.Environment
 import android.util.Log
-import android.view.View
 import android.widget.Button
-import android.widget.PopupMenu
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.lifecycleScope
-import com.github.mikephil.charting.charts.LineChart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import GaitVision.com.R
+import GaitVision.com.data.AnalysisResult
 import GaitVision.com.data.AppDatabase
-import GaitVision.com.data.GaitScore
-import GaitVision.com.data.repository.GaitScoreRepository
-import GaitVision.com.plotLineGraph
-import GaitVision.com.editedUri
-import GaitVision.com.extractedSignals
 import GaitVision.com.participantId
-import GaitVision.com.currentPatientId
-import GaitVision.com.currentVideoId
 import GaitVision.com.extractedFeatures
 import GaitVision.com.extractionDiagnostics
 import GaitVision.com.scoringResult
-import GaitVision.com.gait.GaitCsvExporter
+import GaitVision.com.gait.*
 import GaitVision.com.galleryUri
-import java.io.File
-import java.io.FileOutputStream
 
 class ResultsActivity : BaseActivity() {
+
+    companion object {
+        const val EXTRA_RESULT_ID = "result_id"
+    }
 
     private lateinit var tvGaitScore: TextView
     private lateinit var tvScoreLabel: TextView
     private lateinit var tvAeScore: TextView
     private lateinit var tvRidgeScore: TextView
     private lateinit var tvPcaScore: TextView
-    private lateinit var hipChart: LineChart
-    private lateinit var kneeChart: LineChart
-    private lateinit var ankleChart: LineChart
-    private lateinit var torsoChart: LineChart
-    private lateinit var btnSelectGraph: Button
 
     private var calculatedScore: Double = 0.0
+    private var resultId: Long = -1L
+
+    /** SAF file picker for CSV export -- user chooses save location */
+    private val csvExportLauncher = registerForActivityResult(
+        ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri -> uri?.let { writeCsvToUri(it) } }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -57,12 +50,16 @@ class ResultsActivity : BaseActivity() {
         setupCommonHeader("Analysis Results")
         initializeViews()
         setupButtons()
-        
-        // Calculate and display gait score
-        calculateGaitScore()
-        
-        // Setup charts
-        setupCharts()
+
+        resultId = intent.getLongExtra(EXTRA_RESULT_ID, -1L)
+
+        if (resultId > 0) {
+            // Load from DB into globals, then display
+            loadFromDatabase(resultId)
+        } else {
+            // Globals already set from live analysis
+            calculateGaitScore()
+        }
     }
 
     private fun initializeViews() {
@@ -71,16 +68,10 @@ class ResultsActivity : BaseActivity() {
         tvAeScore = findViewById(R.id.tvAeScore)
         tvRidgeScore = findViewById(R.id.tvRidgeScore)
         tvPcaScore = findViewById(R.id.tvPcaScore)
-        hipChart = findViewById(R.id.lineChartHip)
-        kneeChart = findViewById(R.id.lineChartKnee)
-        ankleChart = findViewById(R.id.lineChartAnkle)
-        torsoChart = findViewById(R.id.lineChartTorso)
-        btnSelectGraph = findViewById(R.id.btnSelectGraph)
     }
 
     private fun setupButtons() {
         findViewById<Button>(R.id.btnMainMenu).setOnClickListener {
-            // Go back to dashboard and clear the back stack
             val intent = Intent(this, DashboardActivity::class.java)
             intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
             startActivity(intent)
@@ -91,81 +82,126 @@ class ResultsActivity : BaseActivity() {
             exportCsvFiles()
         }
 
-        findViewById<Button>(R.id.btnSignalsDashboard).setOnClickListener {
-            val intent = Intent(this, SignalsDashboardActivity::class.java)
-            startActivity(intent)
+        findViewById<Button>(R.id.btnViewFeatures).setOnClickListener {
+            showFeaturesDialog()
         }
 
-        btnSelectGraph.setOnClickListener {
-            showGraphPopup()
+        findViewById<Button>(R.id.btnSignalsDashboard).setOnClickListener {
+            val intent = Intent(this, SignalsDashboardActivity::class.java)
+            if (resultId > 0) intent.putExtra(EXTRA_RESULT_ID, resultId)
+            startActivity(intent)
+        }
+    }
+
+    /**
+     * Load an AnalysisResult from DB and populate the same globals that
+     * the live analysis flow uses. Then call calculateGaitScore() as normal.
+     *
+     * WARNING HEY READ THIS REEEEEEEEAD: This overwrites shared globals (extractedFeatures, scoringResult, etc.).
+     * Safe today because navigation is linear, but a ViewModel/StateFlow refactor
+     * should replace this if we ever need concurrent or comparative analysis views.
+     */
+    private fun loadFromDatabase(id: Long) {
+        lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                AppDatabase.getDatabase(this@ResultsActivity).analysisResultDao().getResultById(id)
+            }
+
+            if (result == null) {
+                Toast.makeText(this@ResultsActivity, "Analysis not found", Toast.LENGTH_SHORT).show()
+                finish()
+                return@launch
+            }
+
+            // Populate globals so all existing code paths work
+            extractedFeatures = GaitFeatures(
+                cadence_spm = result.cadenceSpm ?: Float.NaN,
+                stride_time_s = result.strideTimeS ?: Float.NaN,
+                stride_time_cv = result.strideTimeCv ?: Float.NaN,
+                step_time_asymmetry = result.stepTimeAsymmetry ?: Float.NaN,
+                stride_length_norm = result.strideLengthNorm ?: Float.NaN,
+                stride_amp_norm = result.strideAmpNorm ?: Float.NaN,
+                step_length_asymmetry = result.stepLengthAsymmetry ?: Float.NaN,
+                knee_left_rom = result.kneeLeftRom ?: Float.NaN,
+                knee_right_rom = result.kneeRightRom ?: Float.NaN,
+                knee_left_max = result.kneeLeftMax ?: Float.NaN,
+                knee_right_max = result.kneeRightMax ?: Float.NaN,
+                ldj_knee_left = result.ldjKneeLeft ?: Float.NaN,
+                ldj_knee_right = result.ldjKneeRight ?: Float.NaN,
+                ldj_hip = result.ldjHip ?: Float.NaN,
+                trunk_lean_std_deg = result.trunkLeanStdDeg ?: Float.NaN,
+                inter_ankle_cv = result.interAnkleCv ?: Float.NaN,
+                valid_stride_count = result.validStrideCount
+            )
+
+            scoringResult = ScoringResult(
+                aeScore = result.aeScore ?: Float.NaN,
+                ridgeScore = result.ridgeScore ?: Float.NaN,
+                pcaScore = result.pcaScore ?: Float.NaN
+            )
+
+            extractionDiagnostics = GaitDiagnostics(
+                videoId = result.videoFileName,
+                fpsDetected = result.fpsDetected ?: 30f,
+                durationS = (result.videoLengthMicroseconds ?: 0) / 1_000_000f,
+                numFramesTotal = result.numFramesTotal,
+                numFramesValid = result.numFramesValid,
+                validFrameRate = result.validFrameRate ?: 0f,
+                numStepsDetected = result.numStepsDetected,
+                numStridesValid = result.validStrideCount,
+                estimatedCadenceSpm = result.cadenceSpm ?: 0f,
+                walkingDirection = result.walkingDirection ?: "unknown",
+                wasFlipped = result.wasFlipped,
+                qualityFlag = try { QualityFlag.valueOf(result.qualityFlag ?: "OK") } catch (_: Exception) { QualityFlag.OK }
+            )
+
+            participantId = result.patientId
+
+            // Now just use the same display path
+            calculateGaitScore()
         }
     }
 
     private fun calculateGaitScore() {
-        // PC Pipeline ONLY - no legacy fallback
         val pcFeatures = extractedFeatures
         val pcScore = scoringResult
         val diagnostics = extractionDiagnostics
-        
-        Log.d("ResultsActivity", "calculateGaitScore: features=${pcFeatures != null}, score=${pcScore != null}, diagnostics=${diagnostics != null}")
-        
-        // Check if PC pipeline succeeded
+
         if (pcFeatures != null && pcScore != null && pcFeatures.valid_stride_count > 0) {
-            // SUCCESS: Use PC pipeline scores
             calculatedScore = pcScore.getScoreForDatabase()
             tvGaitScore.text = calculatedScore.toLong().toString()
             tvScoreLabel.text = "${getScoreLabel(calculatedScore)}\n(${pcFeatures.valid_stride_count} strides, ${String.format("%.1f", pcFeatures.cadence_spm)} spm)"
-            
-            // Display all 3 model scores
+
             tvAeScore.text = if (!pcScore.aeScore.isNaN()) pcScore.aeScore.toLong().toString() else "--"
             tvRidgeScore.text = if (!pcScore.ridgeScore.isNaN()) pcScore.ridgeScore.toLong().toString() else "--"
             tvPcaScore.text = if (!pcScore.pcaScore.isNaN()) pcScore.pcaScore.toLong().toString() else "--"
-            
-            // Color individual scores
+
             tvAeScore.setTextColor(getScoreColor(pcScore.aeScore))
             tvRidgeScore.setTextColor(getScoreColor(pcScore.ridgeScore))
             tvPcaScore.setTextColor(getScoreColor(pcScore.pcaScore))
-            
-            // Color primary score
+
             val scoreColor = when {
                 calculatedScore >= 80 -> "#4CAF50"
                 calculatedScore >= 60 -> "#FF9800"
                 else -> "#F44336"
             }
             tvGaitScore.setTextColor(android.graphics.Color.parseColor(scoreColor))
-            
-            Log.d("ResultsActivity", "PC pipeline SUCCESS - AE: ${pcScore.aeScore}, Ridge: ${pcScore.ridgeScore}, PCA: ${pcScore.pcaScore}")
-            
-            saveGaitScoreToDatabase()
-            
         } else {
-            // FAILED: Show error with diagnostic info
             tvGaitScore.text = "--"
             tvAeScore.text = "--"
             tvRidgeScore.text = "--"
             tvPcaScore.text = "--"
-            
+
             val errorMsg = when {
-                pcFeatures == null && diagnostics != null -> 
+                pcFeatures == null && diagnostics != null ->
                     "Extraction failed: ${diagnostics.qualityFlag}\n${diagnostics.rejectionReasons.firstOrNull() ?: ""}"
-                pcFeatures == null -> 
-                    "Feature extraction not run"
-                pcFeatures.valid_stride_count == 0 -> 
-                    "No valid gait cycles detected"
-                pcScore == null -> 
-                    "Scoring failed to initialize"
-                else -> 
-                    "Unknown error"
+                pcFeatures == null -> "Feature extraction not run"
+                pcFeatures.valid_stride_count == 0 -> "No valid gait cycles detected"
+                pcScore == null -> "Scoring failed to initialize"
+                else -> "Unknown error"
             }
-            
             tvScoreLabel.text = errorMsg
             tvGaitScore.setTextColor(android.graphics.Color.parseColor("#F44336"))
-            
-            Log.e("ResultsActivity", "PC pipeline FAILED: $errorMsg")
-            Log.e("ResultsActivity", "  pcFeatures=$pcFeatures, pcScore=$pcScore")
-            if (diagnostics != null) {
-                Log.e("ResultsActivity", "  diagnostics: flag=${diagnostics.qualityFlag}, reasons=${diagnostics.rejectionReasons}")
-            }
         }
     }
 
@@ -179,238 +215,91 @@ class ResultsActivity : BaseActivity() {
             else -> "Significant Impairment"
         }
     }
-    
+
     private fun getScoreColor(score: Float): Int {
         if (score.isNaN()) return android.graphics.Color.GRAY
         return when {
-            score >= 80 -> android.graphics.Color.parseColor("#4CAF50")  // Green
-            score >= 60 -> android.graphics.Color.parseColor("#FF9800")  // Orange
-            else -> android.graphics.Color.parseColor("#F44336")         // Red
+            score >= 80 -> android.graphics.Color.parseColor("#4CAF50")
+            score >= 60 -> android.graphics.Color.parseColor("#FF9800")
+            else -> android.graphics.Color.parseColor("#F44336")
         }
     }
 
-    private fun saveGaitScoreToDatabase() {
-        if (currentPatientId == null || currentVideoId == null) return
-
-        val features = extractedFeatures ?: return
-        
-        lifecycleScope.launch(Dispatchers.IO) {
-            val database = AppDatabase.getDatabase(this@ResultsActivity)
-            val gaitScoreRepository = GaitScoreRepository(database.gaitScoreDao())
-
-            // Use PC pipeline features for subscores
-            val gaitScore = GaitScore(
-                patientId = currentPatientId!!,
-                videoId = currentVideoId!!,
-                overallScore = calculatedScore,
-                leftKneeScore = features.knee_left_rom.toDouble(),
-                rightKneeScore = features.knee_right_rom.toDouble(),
-                leftHipScore = features.ldj_hip.toDouble(),
-                rightHipScore = null,
-                torsoScore = features.trunk_lean_std_deg.toDouble(),
-                recordedAt = System.currentTimeMillis()
-            )
-
-            gaitScoreRepository.insertGaitScore(gaitScore)
-            Log.d("ResultsActivity", "Saved gait score: ${gaitScore.overallScore}")
-        }
-    }
-
-    private fun setupCharts() {
-        val signals = extractedSignals
-        if (signals == null) {
-            Log.w("ResultsActivity", "No signals available for charts")
-            showChart("KNEE")
+    private fun showFeaturesDialog() {
+        val f = extractedFeatures
+        if (f == null) {
+            Toast.makeText(this, "No features available", Toast.LENGTH_SHORT).show()
             return
         }
-        
-        // Convert FloatArrays to Lists, filtering NaN values
-        // Note: plotLineGraph uses index/30 for x-axis, so we keep all valid values
-        val kneeLeft = signals.kneeAngleLeft.filter { !it.isNaN() }
-        val kneeRight = signals.kneeAngleRight.filter { !it.isNaN() }
-        val ankleLeft = signals.ankleAngleLeft.filter { !it.isNaN() }
-        val ankleRight = signals.ankleAngleRight.filter { !it.isNaN() }
-        val hipLeft = signals.hipAngleLeft.filter { !it.isNaN() }
-        val hipRight = signals.hipAngleRight.filter { !it.isNaN() }
-        val torso = signals.trunkAngle.filter { !it.isNaN() }
-        
-        // Plot all charts using Signals data
-        if (kneeLeft.isNotEmpty() || kneeRight.isNotEmpty()) {
-            plotLineGraph(kneeChart, kneeLeft, kneeRight, "Left Knee", "Right Knee")
-        }
-        if (ankleLeft.isNotEmpty() || ankleRight.isNotEmpty()) {
-            plotLineGraph(ankleChart, ankleLeft, ankleRight, "Left Ankle", "Right Ankle")
-        }
-        if (hipLeft.isNotEmpty() || hipRight.isNotEmpty()) {
-            plotLineGraph(hipChart, hipLeft, hipRight, "Left Hip", "Right Hip")
-        }
-        if (torso.isNotEmpty()) {
-            plotLineGraph(torsoChart, torso, torso, "Torso", "Torso")
+
+        fun fmt(v: Float) = if (v.isNaN()) "--" else String.format("%.2f", v)
+
+        val msg = buildString {
+            appendLine("Cadence: ${fmt(f.cadence_spm)} spm")
+            appendLine("Stride time: ${fmt(f.stride_time_s)} s")
+            appendLine("Stride time CV: ${fmt(f.stride_time_cv)}")
+            appendLine("Step time asymmetry: ${fmt(f.step_time_asymmetry)}")
+            appendLine("Stride length: ${fmt(f.stride_length_norm)}")
+            appendLine("Stride amplitude: ${fmt(f.stride_amp_norm)}")
+            appendLine("Step length asymmetry: ${fmt(f.step_length_asymmetry)}")
+            appendLine("Knee ROM L/R: ${fmt(f.knee_left_rom)} / ${fmt(f.knee_right_rom)}")
+            appendLine("Knee max L/R: ${fmt(f.knee_left_max)} / ${fmt(f.knee_right_max)}")
+            appendLine("LDJ knee L/R: ${fmt(f.ldj_knee_left)} / ${fmt(f.ldj_knee_right)}")
+            appendLine("LDJ hip: ${fmt(f.ldj_hip)}")
+            appendLine("Trunk lean std: ${fmt(f.trunk_lean_std_deg)}")
+            append("Inter-ankle CV: ${fmt(f.inter_ankle_cv)}")
         }
 
-        // Initially show knee chart
-        showChart("KNEE")
-    }
-
-    private fun showGraphPopup() {
-        val popup = PopupMenu(this, btnSelectGraph)
-        popup.menu.add(0, 1, 0, "Knee Graph")
-        popup.menu.add(0, 2, 1, "Hip Graph")
-        popup.menu.add(0, 3, 2, "Ankle Graph")
-        popup.menu.add(0, 4, 3, "Torso Graph")
-
-        popup.setOnMenuItemClickListener { item ->
-            when (item.itemId) {
-                1 -> showChart("KNEE")
-                2 -> showChart("HIP")
-                3 -> showChart("ANKLE")
-                4 -> showChart("TORSO")
-            }
-            btnSelectGraph.text = item.title
-            true
-        }
-        popup.show()
-    }
-
-    private fun showChart(chartType: String) {
-        hipChart.visibility = View.INVISIBLE
-        kneeChart.visibility = View.INVISIBLE
-        ankleChart.visibility = View.INVISIBLE
-        torsoChart.visibility = View.INVISIBLE
-
-        when (chartType) {
-            "HIP" -> {
-                hipChart.visibility = View.VISIBLE
-                btnSelectGraph.text = "Hip Graph"
-            }
-            "KNEE" -> {
-                kneeChart.visibility = View.VISIBLE
-                btnSelectGraph.text = "Knee Graph"
-            }
-            "ANKLE" -> {
-                ankleChart.visibility = View.VISIBLE
-                btnSelectGraph.text = "Ankle Graph"
-            }
-            "TORSO" -> {
-                torsoChart.visibility = View.VISIBLE
-                btnSelectGraph.text = "Torso Graph"
-            }
-        }
+        AlertDialog.Builder(this)
+            .setTitle("Gait Features (${f.valid_stride_count} strides)")
+            .setMessage(msg)
+            .setPositiveButton("OK", null)
+            .show()
     }
 
     private fun exportCsvFiles() {
-        val signals = extractedSignals
-        if (signals == null) {
-            Toast.makeText(this, "No signal data to export", Toast.LENGTH_SHORT).show()
+        if (extractionDiagnostics == null) {
+            Toast.makeText(this, "Nothing to export", Toast.LENGTH_SHORT).show()
             return
         }
 
-        // Generate a timestamp prefix if this is a Quick Analysis (id == 0)
-        // Format: yyyy-MM-dd_HH-mm-ss (Windows-safe)
         val filePrefix = if (participantId == 0) {
             val timestamp = java.text.SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", java.util.Locale.US).format(java.util.Date())
             "${timestamp}_0"
         } else {
             participantId.toString()
         }
-        
-        // Convert FloatArrays to Lists for export
-        val fileData = listOf(
-            signals.hipAngleLeft.toList(),
-            signals.hipAngleRight.toList(),
-            signals.kneeAngleLeft.toList(),
-            signals.kneeAngleRight.toList(),
-            signals.ankleAngleLeft.toList(),
-            signals.ankleAngleRight.toList(),
-            signals.trunkAngle.toList()
-        )
 
-        val angleNames = listOf(
-            "LeftHip",
-            "RightHip",
-            "LeftKnee",
-            "RightKnee",
-            "LeftAnkle",
-            "RightAnkle",
-            "Torso"
-        )
+        val filename = GaitCsvExporter.generateFilename(filePrefix)
+        csvExportLauncher.launch(filename)
+    }
 
+    private fun writeCsvToUri(uri: Uri) {
         try {
-            // Export wireframe angle files (for visualization)
-            for (i in fileData.indices) {
-                val fileName = "${filePrefix}_${angleNames[i]}.csv"
-                writeToFile(fileName, fileData[i])
-            }
-            
-            // Export PC-style gait features CSV
-            val diagnostics = extractionDiagnostics
-            if (diagnostics != null) {
-                val videoName = galleryUri?.lastPathSegment ?: "unknown"
-                val csvPath = GaitCsvExporter.exportToCSV(
-                    context = this,
+            val diagnostics = extractionDiagnostics ?: return
+            val videoName = galleryUri?.lastPathSegment
+                ?: diagnostics.videoId.takeIf { it.isNotBlank() }
+                ?: "unknown"
+            val filePrefix = if (participantId == 0) "0" else participantId.toString()
+
+            contentResolver.openOutputStream(uri)?.use { stream ->
+                val success = GaitCsvExporter.writeToStream(
+                    outputStream = stream,
                     features = extractedFeatures,
                     diagnostics = diagnostics,
                     score = scoringResult,
-                    participantId = filePrefix, // Use the full prefix (timestamp or ID)
+                    participantId = filePrefix,
                     videoName = videoName
                 )
-                if (csvPath != null) {
-                    Log.d("ResultsActivity", "PC-style CSV exported to: $csvPath")
+                if (success) {
+                    Toast.makeText(this, "CSV exported successfully", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this, "Failed to write CSV", Toast.LENGTH_SHORT).show()
                 }
-            }
-
-            // Rename edited video
-            renameEditedVideo(filePrefix)
-
-            // Build export message
-            val message = StringBuilder()
-            message.appendLine("CSV files saved to Documents as ${filePrefix}_GraphName.csv")
-            if (extractedFeatures != null) {
-                message.appendLine("\nGait features CSV exported with ${extractedFeatures!!.valid_stride_count} valid strides")
-            }
-            message.appendLine("\nVideo saved to Movies as ${filePrefix}_video.mp4")
-
-            AlertDialog.Builder(this)
-                .setTitle("Export Successful")
-                .setMessage(message.toString())
-                .setPositiveButton("OK") { dialog, _ -> dialog.dismiss() }
-                .show()
-
+            } ?: Toast.makeText(this, "Could not open file for writing", Toast.LENGTH_SHORT).show()
         } catch (e: Exception) {
             Log.e("ResultsActivity", "Error exporting: ${e.message}", e)
-            Toast.makeText(this, "Error exporting files: ${e.message}", Toast.LENGTH_LONG).show()
-        }
-    }
-
-    private fun writeToFile(fileName: String, fileData: List<Float>) {
-        val fileDirectory = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
-        val outputFile = File(fileDirectory, fileName)
-
-        FileOutputStream(outputFile).use { output ->
-            output.write("Frame #,Angle\n".toByteArray())
-            for (i in fileData.indices) {
-                output.write("$i,${fileData[i]}\n".toByteArray())
-            }
-        }
-
-        MediaScannerConnection.scanFile(this, arrayOf(outputFile.absolutePath), null, null)
-    }
-
-    private fun renameEditedVideo(filePrefix: String) {
-        val vidName = "${filePrefix}_video.mp4"
-        val oldFilePath = File(
-            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES),
-            "edited_video.mp4"
-        )
-        val newFilePath = File(
-            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES),
-            vidName
-        )
-
-        if (oldFilePath.exists()) {
-            oldFilePath.renameTo(newFilePath)
-            editedUri = Uri.fromFile(newFilePath)
-            MediaScannerConnection.scanFile(this, arrayOf(newFilePath.absolutePath), null, null)
+            Toast.makeText(this, "Error exporting: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
 

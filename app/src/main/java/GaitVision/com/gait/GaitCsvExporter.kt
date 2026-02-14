@@ -1,41 +1,53 @@
 package GaitVision.com.gait
 
-import android.content.Context
-import android.media.MediaScannerConnection
-import android.os.Environment
 import android.util.Log
-import java.io.File
-import java.io.FileWriter
+import java.io.OutputStream
+import java.io.OutputStreamWriter
 import java.text.SimpleDateFormat
 import java.util.*
 
 /**
  * CSV export utility for gait analysis results.
  * Exports in PC pipeline compatible format.
+ * Uses OutputStream so callers can write to any destination (SAF, file, etc.)
  */
 object GaitCsvExporter {
     
     private const val TAG = "GaitCsvExporter"
-    
+
+    /** Sanitize a value for safe CSV output (prevents formula injection in Excel/Sheets). */
+    private fun sanitize(value: String): String {
+        val needsQuoting = value.any { it == ',' || it == '"' || it == '\n' || it == '\r' }
+        val startsWithFormula = value.firstOrNull()?.let { it == '=' || it == '+' || it == '-' || it == '@' } ?: false
+        return when {
+            startsWithFormula -> "\"'${value.replace("\"", "\"\"")}\""
+            needsQuoting -> "\"${value.replace("\"", "\"\"")}\""
+            else -> value
+        }
+    }
+
+    /** Generate a suggested filename for the CSV export. */
+    fun generateFilename(participantId: String): String {
+        val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+        return "${participantId}_gait_${timestamp}.csv"
+    }
+
     /**
-     * Export gait features and diagnostics to CSV.
-     * Returns the file path of the exported CSV.
+     * Write gait features and diagnostics as CSV to the given OutputStream.
+     * Returns true on success.
      */
-    fun exportToCSV(
-        context: Context,
+    fun writeToStream(
+        outputStream: OutputStream,
         features: GaitFeatures?,
         diagnostics: GaitDiagnostics,
         score: ScoringResult?,
         participantId: String,
         videoName: String
-    ): String? {
-        try {
+    ): Boolean {
+        return try {
             val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-            val filename = "${participantId}_gait_${timestamp}.csv"
-            
-            val file = File(context.getExternalFilesDir(null), filename)
-            
-            FileWriter(file).use { writer ->
+
+            OutputStreamWriter(outputStream).use { writer ->
                 // Header row
                 val headers = mutableListOf(
                     "participant_id",
@@ -69,12 +81,12 @@ object GaitCsvExporter {
                 // Data row
                 val values = mutableListOf<String>()
                 
-                // Metadata
-                values.add(participantId)
-                values.add(videoName)
+                // Metadata (sanitize user-controlled strings to prevent CSV injection)
+                values.add(sanitize(participantId))
+                values.add(sanitize(videoName))
                 values.add(timestamp)
                 values.add(diagnostics.qualityFlag.name)
-                values.add(diagnostics.walkingDirection)
+                values.add(sanitize(diagnostics.walkingDirection))
                 values.add(diagnostics.wasFlipped.toString())
                 values.add(diagnostics.fpsDetected.toString())
                 values.add(diagnostics.durationS.toString())
@@ -107,67 +119,11 @@ object GaitCsvExporter {
                 writer.write("\n")
             }
             
-            Log.d(TAG, "Exported CSV to: ${file.absolutePath}")
-            return file.absolutePath
-            
+            Log.d(TAG, "CSV written successfully")
+            true
         } catch (e: Exception) {
-            Log.e(TAG, "Error exporting CSV", e)
-            return null
-        }
-    }
-    
-    /**
-     * Export per-frame signals to CSV (for debugging/visualization).
-     * Includes all computed signals matching PC dashboard.
-     */
-    fun exportSignalsToCSV(
-        context: Context,
-        signals: Signals,
-        participantId: String
-    ): String? {
-        try {
-            val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-            val filename = "${participantId}_signals_${timestamp}.csv"
-            
-            val fileDirectory = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
-            val file = File(fileDirectory, filename)
-            
-            FileWriter(file).use { writer ->
-                // Header - all signals
-                writer.write("frame_idx,timestamp_s,is_valid,inter_ankle_dist,knee_angle_left,knee_angle_right,trunk_angle,ankle_left_y,ankle_right_y,hip_left_y,hip_right_y,ankle_left_vy,ankle_right_vy,hip_avg_vy\n")
-                
-                // Data rows
-                for (i in signals.frameIndices.indices) {
-                    val row = listOf(
-                        signals.frameIndices[i].toString(),
-                        formatFloat(signals.timestamps[i]),
-                        signals.isValid[i].toString(),
-                        formatFloat(signals.interAnkleDist[i]),
-                        formatFloat(signals.kneeAngleLeft[i]),
-                        formatFloat(signals.kneeAngleRight[i]),
-                        formatFloat(signals.trunkAngle[i]),
-                        formatFloat(signals.ankleLeftY[i]),
-                        formatFloat(signals.ankleRightY[i]),
-                        formatFloat(signals.hipLeftY[i]),
-                        formatFloat(signals.hipRightY[i]),
-                        formatFloat(signals.ankleLeftVy[i]),
-                        formatFloat(signals.ankleRightVy[i]),
-                        formatFloat(signals.hipAvgVy[i])
-                    )
-                    writer.write(row.joinToString(","))
-                    writer.write("\n")
-                }
-            }
-            
-            // Scan so it shows up in file browsers
-            MediaScannerConnection.scanFile(context, arrayOf(file.absolutePath), null, null)
-            
-            Log.d(TAG, "Exported signals CSV to: ${file.absolutePath}")
-            return file.absolutePath
-            
-        } catch (e: Exception) {
-            Log.e(TAG, "Error exporting signals CSV", e)
-            return null
+            Log.e(TAG, "Error writing CSV", e)
+            false
         }
     }
     
@@ -226,9 +182,5 @@ object GaitCsvExporter {
         }
         
         return sb.toString()
-    }
-    
-    private fun formatFloat(value: Float): String {
-        return if (value.isNaN()) "NaN" else "%.4f".format(value)
     }
 }

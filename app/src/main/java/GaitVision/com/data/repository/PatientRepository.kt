@@ -3,6 +3,7 @@ package GaitVision.com.data.repository
 import GaitVision.com.data.Patient
 import GaitVision.com.data.PatientDao
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 
 class PatientRepository(private val patientDao: PatientDao) {
 
@@ -58,14 +59,9 @@ class PatientRepository(private val patientDao: PatientDao) {
     }
 
     suspend fun findPatientByName(firstName: String, lastName: String): Patient? {
-        return patientDao.getAllPatients().let { flow ->
-            // simplified approach
-            val patients = mutableListOf<Patient>()
-            flow.collect { patients.addAll(it) }
-            return patients.find {
-                it.firstName.equals(firstName, ignoreCase = true) &&
-                it.lastName.equals(lastName, ignoreCase = true)
-            }
+        return patientDao.getAllPatients().first().find {
+            it.firstName.equals(firstName, ignoreCase = true) &&
+            it.lastName.equals(lastName, ignoreCase = true)
         }
     }
 

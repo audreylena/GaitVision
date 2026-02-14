@@ -13,6 +13,7 @@ import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
 import android.media.MediaMuxer
+import android.os.Build
 import android.net.Uri
 import android.util.Log
 import android.view.Surface
@@ -59,6 +60,14 @@ import GaitVision.com.gait.QualityFlag
  *   G = Y - 0.698001 * (V - 128) - 0.337633 * (U - 128)
  *   B = Y + 1.732446 * (U - 128)
  */
+// Reusable buffers for YUV→RGB conversion, allocated once per video
+// Eliminates ~1500 large array allocations over a 300-frame video.
+private var yBytesCache: ByteArray? = null
+private var uBytesCache: ByteArray? = null
+private var vBytesCache: ByteArray? = null
+private var pixelsCache: IntArray? = null
+private var bitmapCache: Bitmap? = null
+
 private fun imageToBitmap(image: Image): Bitmap {
     val width = image.width
     val height = image.height
@@ -67,49 +76,62 @@ private fun imageToBitmap(image: Image): Bitmap {
     val uPlane = image.planes[1]
     val vPlane = image.planes[2]
     
-    val yBuffer = yPlane.buffer.duplicate()
-    val uBuffer = uPlane.buffer.duplicate()
-    val vBuffer = vPlane.buffer.duplicate()
-    
     val yRowStride = yPlane.rowStride
     val uvRowStride = uPlane.rowStride
     val uvPixelStride = uPlane.pixelStride
     
-    // Create output pixel array
-    val pixels = IntArray(width * height)
+    // Bulk-copy plane data into reusable byte arrays — one call per plane instead of
+    // millions of ByteBuffer.get(index) calls with JVM bounds checking.
+    val yBuffer = yPlane.buffer.duplicate().apply { position(0) }
+    val uBuffer = uPlane.buffer.duplicate().apply { position(0) }
+    val vBuffer = vPlane.buffer.duplicate().apply { position(0) }
+    
+    val ySize = yBuffer.remaining()
+    val uSize = uBuffer.remaining()
+    val vSize = vBuffer.remaining()
+    val pixelCount = width * height
+    
+    // Reuse arrays if same size, otherwise allocate new ones (happens once per video)
+    val yBytes = yBytesCache?.takeIf { it.size == ySize } ?: ByteArray(ySize).also { yBytesCache = it }
+    val uBytes = uBytesCache?.takeIf { it.size == uSize } ?: ByteArray(uSize).also { uBytesCache = it }
+    val vBytes = vBytesCache?.takeIf { it.size == vSize } ?: ByteArray(vSize).also { vBytesCache = it }
+    val pixels = pixelsCache?.takeIf { it.size == pixelCount } ?: IntArray(pixelCount).also { pixelsCache = it }
+    
+    yBuffer.get(yBytes, 0, ySize)
+    uBuffer.get(uBytes, 0, uSize)
+    vBuffer.get(vBytes, 0, vSize)
     
     // Direct YUV→RGB conversion (no JPEG lossy step)
+    // Row-invariant values are hoisted out of the inner loop to avoid
+    // millions of redundant multiplications and divisions.
     for (row in 0 until height) {
+        val yRowOffset = row * yRowStride
+        val uvRowOffset = (row shr 1) * uvRowStride  // row/2 via bit shift
+        val pixelRowOffset = row * width
+        
         for (col in 0 until width) {
-            // Y value
-            val yIndex = row * yRowStride + col
-            val y = (yBuffer.get(yIndex).toInt() and 0xFF)
+            val y = (yBytes[yRowOffset + col].toInt() and 0xFF)
             
-            // UV values (subsampled 2x2)
-            val uvRow = row / 2
-            val uvCol = col / 2
-            val uvIndex = uvRow * uvRowStride + uvCol * uvPixelStride
-            
-            val u = (uBuffer.get(uvIndex).toInt() and 0xFF) - 128
-            val v = (vBuffer.get(uvIndex).toInt() and 0xFF) - 128
+            val uvIndex = uvRowOffset + (col shr 1) * uvPixelStride
+            val u = (uBytes[uvIndex].toInt() and 0xFF) - 128
+            val v = (vBytes[uvIndex].toInt() and 0xFF) - 128
             
             // BT.601 YUV→RGB (matches OpenCV's COLOR_YUV2RGB behavior)
             var r = (y + 1.370705 * v).toInt()
             var g = (y - 0.698001 * v - 0.337633 * u).toInt()
             var b = (y + 1.732446 * u).toInt()
             
-            // Clamp to 0-255
             r = r.coerceIn(0, 255)
             g = g.coerceIn(0, 255)
             b = b.coerceIn(0, 255)
             
-            // Pack as ARGB
-            pixels[row * width + col] = (0xFF shl 24) or (r shl 16) or (g shl 8) or b
+            pixels[pixelRowOffset + col] = (0xFF shl 24) or (r shl 16) or (g shl 8) or b
         }
     }
     
-    // Create mutable bitmap for wireframe drawing
-    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    // Reuse bitmap if same dimensions (avoids allocation + GC per frame)
+    val bitmap = bitmapCache?.takeIf { it.width == width && it.height == height && !it.isRecycled }
+        ?: Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also { bitmapCache = it }
     bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
     return bitmap
 }
@@ -167,10 +189,25 @@ var detectedFps: Float = 30f
  * Initialize MediaPipe backend for a processing session.
  * Uses OPTIMAL_CONFIG parameters from PC pipeline for feature parity.
  */
+/** Detect emulator — GPU delegate doesn't work on emulator OpenGL. */
+private fun isEmulator(): Boolean {
+    return (Build.FINGERPRINT.startsWith("generic")
+            || Build.FINGERPRINT.startsWith("unknown")
+            || Build.MODEL.contains("Emulator")
+            || Build.MODEL.contains("Android SDK built for x86")
+            || Build.HARDWARE.contains("goldfish")
+            || Build.HARDWARE.contains("ranchu")
+            || Build.PRODUCT.contains("sdk"))
+}
+
 fun initializeMediaPipeBackend(context: Context) {
     if (mediaPipeBackend == null) {
-        // Use CPU if forceCpuInference is true (for parity validation with PC)
-        val useGpu = !forceCpuInference
+        // GPU delegate crashes at runtime on emulator (GL_INVALID_ENUM) — force CPU there
+        val onEmulator = isEmulator()
+        val useGpu = !forceCpuInference && !onEmulator
+        if (onEmulator) {
+            Log.d("ImageProcessing", "Emulator detected — forcing CPU delegate")
+        }
         mediaPipeBackend = MediaPipePoseBackend(
             context = context,
             minDetectionConfidence = 0.40f,  // OPTIMAL_CONFIG
@@ -178,7 +215,7 @@ fun initializeMediaPipeBackend(context: Context) {
             minPresenceConfidence = 0.5f,
             useGpu = useGpu
         )
-        val delegateType = if (useGpu) "GPU" else "CPU (parity mode)"
+        val delegateType = if (useGpu) "GPU" else "CPU${if (onEmulator) " (emulator)" else " (parity mode)"}"
         Log.d("ImageProcessing", "MediaPipe backend initialized with OPTIMAL_CONFIG, delegate: $delegateType")
     }
 }
@@ -382,17 +419,14 @@ fun processFrameWithMediaPipe(
 ): PoseFrame? {
     val backend = mediaPipeBackend ?: return null
     
-    // Only downscale if CLAHE is enabled (downscaling was for CLAHE performance)
-    // Without CLAHE, process at full resolution for maximum accuracy
+    // Always downscale to 720p for inference, MediaPipe internally resizes to ~256x256
     var t0 = System.currentTimeMillis()
-    val scaledBitmap = if (applyClahe && (bitmap.width > PROCESSING_WIDTH || bitmap.height > PROCESSING_HEIGHT)) {
+    val scaledBitmap = if (bitmap.width > PROCESSING_WIDTH || bitmap.height > PROCESSING_HEIGHT) {
         Bitmap.createScaledBitmap(bitmap, PROCESSING_WIDTH, PROCESSING_HEIGHT, true)
     } else {
         bitmap
     }
-    if (applyClahe) {
-        totalDownscaleTimeMs += System.currentTimeMillis() - t0
-    }
+    totalDownscaleTimeMs += System.currentTimeMillis() - t0
     
     // Optionally apply CLAHE contrast enhancement (mirrors PC _apply_clahe)
     t0 = System.currentTimeMillis()
@@ -412,6 +446,14 @@ fun processFrameWithMediaPipe(
     val result = backend.processFrame(processedBitmap, timestampMs)
     totalPureMediaPipeTimeMs += System.currentTimeMillis() - t0
     mediaPipeFrameCount++
+    
+    // Recycle intermediate bitmaps that are separate allocations from the input
+    if (applyClahe && processedBitmap !== scaledBitmap) {
+        processedBitmap.recycle()
+    }
+    if (scaledBitmap !== bitmap) {
+        scaledBitmap.recycle()
+    }
     
     return MediaPipeResultConverter.toPoseFrame(
         result = result,
@@ -593,7 +635,7 @@ suspend fun ProcVidEmpty(context: Context, outputPath: String, activity: AppComp
         return null
     }
 
-    val frameDurationUs = 1000000L / fps.toLong()
+    val frameDurationUs = (1000000.0 / fps).toLong()
     val encoderState = EncoderState(encoder, mediaMuxer, inputSurface, frameDurationUs = frameDurationUs)
     val decoderBufferInfo = MediaCodec.BufferInfo()
     var frameIndex = 0
@@ -603,6 +645,11 @@ suspend fun ProcVidEmpty(context: Context, outputPath: String, activity: AppComp
     
     Log.d(TAG, "FAST STREAMING: Processing ~$totalFrames frames with MediaCodec")
     Log.d(TAG, "GPU delegate: ${mediaPipeBackend?.isUsingGpu() ?: false}, CLAHE: $enableCLAHE")
+
+    // Cache view references and progress state to avoid repeated findViewById + unnecessary context switches
+    val progressBar = activity.findViewById<ProgressBar>(R.id.splittingBar)
+    val progressText = activity.findViewById<TextView>(R.id.splittingProgressValue)
+    var lastProgress = -1
 
     // === FAST MediaCodec STREAMING LOOP ===
     while (!outputDone) {
@@ -644,30 +691,38 @@ suspend fun ProcVidEmpty(context: Context, outputPath: String, activity: AppComp
                     try {
                         val image = decoder.getOutputImage(outputBufferId)
                         if (image != null) {
-                            // Convert YUV to Bitmap
+                            // Convert YUV to Bitmap, then release decoder buffer immediately.
+                            // Pixel data is fully copied into our Bitmap, so the decoder
+                            // can start decoding the next frame while we run MediaPipe.
                             val frame: Bitmap
                             try {
                                 frame = imageToBitmap(image)
                             } finally {
                                 image.close()
+                                decoder.releaseOutputBuffer(outputBufferId, false)
                             }
                             
                             // Process frame (pose detection + wireframe) and encode
                             val modifiedBitmap = processFrame(frame, frameIndex)
                             encoderState.encodeFrame(modifiedBitmap, frameIndex)
+                            // Note: frame/modifiedBitmap is reused via bitmapCache — don't recycle
                             
-                            // Update progress
+                            // Update progress only when percentage actually changes
                             frameIndex++
                             val progress = ((frameIndex.toFloat() / totalFrames) * 100).toInt().coerceIn(0, 100)
-                            withContext(Dispatchers.Main) {
-                                activity.findViewById<ProgressBar>(R.id.splittingBar).progress = progress
-                                activity.findViewById<TextView>(R.id.splittingProgressValue).text = " $progress%"
+                            if (progress != lastProgress) {
+                                lastProgress = progress
+                                withContext(Dispatchers.Main) {
+                                    progressBar.progress = progress
+                                    progressText.text = " $progress%"
+                                }
                             }
+                        } else {
+                            decoder.releaseOutputBuffer(outputBufferId, false)
                         }
                     } catch (e: Exception) {
                         Log.w(TAG, "Error processing frame $frameIndex: ${e.message}")
                     }
-                    decoder.releaseOutputBuffer(outputBufferId, false)
                 }
             }
         }
@@ -691,6 +746,20 @@ suspend fun ProcVidEmpty(context: Context, outputPath: String, activity: AppComp
     
     // Feature extraction (uses poseFrames which is small)
     extractGaitFeatures(context, width, height, frameIndex, activity)
+    
+    // Free heavy memory now that processing is done
+    val frameCount = poseFrames.size
+    frameList.clear()
+    poseFrames.clear()
+    
+    // Release reusable YUV conversion buffers
+    bitmapCache?.recycle()
+    bitmapCache = null
+    yBytesCache = null
+    uBytesCache = null
+    vBytesCache = null
+    pixelsCache = null
+    Log.d(TAG, "Cleared frameList and poseFrames ($frameCount poses freed)")
     
     Log.d(TAG, "Pipeline complete")
 

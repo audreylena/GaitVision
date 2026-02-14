@@ -13,15 +13,21 @@ import com.github.mikephil.charting.components.LimitLine
 import com.github.mikephil.charting.data.Entry
 import com.github.mikephil.charting.data.LineData
 import com.github.mikephil.charting.data.LineDataSet
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import GaitVision.com.R
+import GaitVision.com.data.AppDatabase
+import GaitVision.com.data.SignalData
 import GaitVision.com.extractedSignals
 import GaitVision.com.extractedStrides
 import GaitVision.com.selectedStrideIndices
-import GaitVision.com.extractionDiagnostics
 import GaitVision.com.stepSignalMode
-import GaitVision.com.participantId
-import GaitVision.com.gait.GaitCsvExporter
 import GaitVision.com.gait.Signals
+import GaitVision.com.gait.Stride
+import org.json.JSONArray
+import org.json.JSONObject
 
 /**
  * Dashboard showing all computed signals for debugging and analysis.
@@ -48,6 +54,9 @@ class SignalsDashboardActivity : BaseActivity() {
     private lateinit var chartTrunk: LineChart
 
     private var currentSignal = "INTER_ANKLE"
+    private var cachedSignals: Signals? = null
+    private var cachedStrides: List<Stride>? = null
+    private val populatedCharts = mutableSetOf<String>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -104,10 +113,6 @@ class SignalsDashboardActivity : BaseActivity() {
         btnSelectSignal.setOnClickListener {
             showSignalPopup()
         }
-
-        findViewById<Button>(R.id.btnExportSignals).setOnClickListener {
-            exportSignals()
-        }
     }
 
     private fun showSignalPopup() {
@@ -145,6 +150,20 @@ class SignalsDashboardActivity : BaseActivity() {
         chartHipY.visibility = View.INVISIBLE
         chartTrunk.visibility = View.INVISIBLE
 
+        // Lazy-populate: only build chart data on first show
+        val signals = cachedSignals
+        if (signals != null && signalType !in populatedCharts) {
+            when (signalType) {
+                "INTER_ANKLE" -> populateInterAnkleChart(signals, cachedStrides)
+                "KNEE_ANGLES" -> populateKneeAnglesChart(signals, cachedStrides)
+                "ANKLE_Y" -> populateAnkleYChart(signals, cachedStrides)
+                "ANKLE_VY" -> populateAnkleVyChart(signals, cachedStrides)
+                "HIP_Y" -> populateHipYChart(signals, cachedStrides)
+                "TRUNK" -> populateTrunkChart(signals, cachedStrides)
+            }
+            populatedCharts.add(signalType)
+        }
+
         when (signalType) {
             "INTER_ANKLE" -> chartInterAnkle.visibility = View.VISIBLE
             "KNEE_ANGLES" -> chartKneeAngles.visibility = View.VISIBLE
@@ -169,9 +188,46 @@ class SignalsDashboardActivity : BaseActivity() {
     }
 
     private fun loadData() {
+        val resultId = intent.getLongExtra(ResultsActivity.EXTRA_RESULT_ID, -1L)
+
+        if (resultId > 0) {
+            loadFromDatabase(resultId)
+        } else {
+            displaySignals()
+        }
+    }
+
+    /**
+     * Load from DB into globals, then call displaySignals() as normal.
+     *
+     * WARNING: This overwrites shared globals (extractedSignals, extractedStrides, etc.).
+     * Safe today because navigation is linear, but a ViewModel/StateFlow refactor
+     * should replace this if we ever need concurrent or comparative analysis views.
+     */
+    private fun loadFromDatabase(resultId: Long) {
+        lifecycleScope.launch {
+            val db = AppDatabase.getDatabase(this@SignalsDashboardActivity)
+            val result = withContext(Dispatchers.IO) { db.analysisResultDao().getResultById(resultId) }
+            val signalRows = withContext(Dispatchers.IO) { db.signalDataDao().getSignalDataByResultId(resultId) }
+
+            if (signalRows.isEmpty()) {
+                Toast.makeText(this@SignalsDashboardActivity, "No signal data for this analysis", Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+
+            // Set globals so all existing code works
+            extractedSignals = buildSignalsFromDb(signalRows)
+            stepSignalMode = result?.stepSignalMode
+            extractedStrides = parseStridesJson(result?.stridesJson)
+            selectedStrideIndices = parseSelectedIndicesJson(result?.selectedStrideIndicesJson)
+
+            displaySignals()
+        }
+    }
+
+    private fun displaySignals() {
         val signals = extractedSignals
         val strides = extractedStrides
-        val diagnostics = extractionDiagnostics
 
         if (signals == null) {
             tvStepMode.text = "No data"
@@ -181,7 +237,11 @@ class SignalsDashboardActivity : BaseActivity() {
             return
         }
 
-        // Update info card
+        // Cache for lazy chart population
+        cachedSignals = signals
+        cachedStrides = strides
+        populatedCharts.clear()
+
         tvStepMode.text = stepSignalMode ?: "UNKNOWN"
         tvValidStrides.text = (strides?.count { it.isValid } ?: 0).toString()
 
@@ -190,15 +250,89 @@ class SignalsDashboardActivity : BaseActivity() {
         val validPct = if (totalFrames > 0) (validFrames * 100 / totalFrames) else 0
         tvFrameValidity.text = "$validPct%"
 
-        // Populate all charts
-        populateInterAnkleChart(signals, strides)
-        populateKneeAnglesChart(signals, strides)
-        populateAnkleYChart(signals, strides)
-        populateAnkleVyChart(signals, strides)
-        populateHipYChart(signals, strides)
-        populateTrunkChart(signals, strides)
+        // Only populate the default visible chart; others populated on demand
+        showChart("INTER_ANKLE", "Inter-Ankle Distance")
 
         Log.d(TAG, "Loaded ${signals.timestamps.size} frames, ${strides?.size ?: 0} strides")
+    }
+
+    private fun buildSignalsFromDb(rows: List<SignalData>): Signals {
+        val n = rows.size
+        val timestamps = FloatArray(n) { rows[it].timestamp ?: (it / 30f) }
+        val frameIndices = IntArray(n) { rows[it].frameNumber }
+        val isValid = BooleanArray(n) { rows[it].isValid }
+        val interAnkleDist = FloatArray(n) { rows[it].interAnkleDist ?: Float.NaN }
+        val kneeAngleLeft = FloatArray(n) { rows[it].kneeAngleLeft ?: Float.NaN }
+        val kneeAngleRight = FloatArray(n) { rows[it].kneeAngleRight ?: Float.NaN }
+        val trunkAngle = FloatArray(n) { rows[it].trunkAngle ?: Float.NaN }
+        val ankleLeftY = FloatArray(n) { rows[it].ankleLeftY ?: Float.NaN }
+        val ankleRightY = FloatArray(n) { rows[it].ankleRightY ?: Float.NaN }
+        val hipLeftY = FloatArray(n) { rows[it].hipLeftY ?: Float.NaN }
+        val hipRightY = FloatArray(n) { rows[it].hipRightY ?: Float.NaN }
+        val ankleLeftVy = FloatArray(n) { rows[it].ankleLeftVy ?: Float.NaN }
+        val ankleRightVy = FloatArray(n) { rows[it].ankleRightVy ?: Float.NaN }
+        // Fields not stored in signal_data — fill with NaN
+        val empty = FloatArray(n) { Float.NaN }
+
+        return Signals(
+            timestamps = timestamps,
+            frameIndices = frameIndices,
+            isValid = isValid,
+            interAnkleDist = interAnkleDist,
+            kneeAngleLeft = kneeAngleLeft,
+            kneeAngleRight = kneeAngleRight,
+            trunkAngle = trunkAngle,
+            ankleAngleLeft = empty,
+            ankleAngleRight = empty,
+            hipAngleLeft = empty,
+            hipAngleRight = empty,
+            strideAngle = empty,
+            ankleLeftX = empty,
+            ankleRightX = empty,
+            ankleLeftY = ankleLeftY,
+            ankleRightY = ankleRightY,
+            hipLeftY = hipLeftY,
+            hipRightY = hipRightY,
+            ankleLeftVy = ankleLeftVy,
+            ankleRightVy = ankleRightVy,
+            hipAvgVy = empty
+        )
+    }
+
+    private fun parseStridesJson(json: String?): List<Stride>? {
+        if (json.isNullOrBlank()) return null
+        return try {
+            val arr = JSONArray(json)
+            (0 until arr.length()).map { i ->
+                val o = arr.getJSONObject(i)
+                Stride(
+                    startFrame = o.getInt("sf"),
+                    endFrame = o.getInt("ef"),
+                    startTimeS = o.getDouble("st").toFloat(),
+                    endTimeS = o.getDouble("et").toFloat(),
+                    step1Frame = o.getInt("s1f"),
+                    step2Frame = o.getInt("s2f"),
+                    step1TimeS = o.getDouble("s1t").toFloat(),
+                    step2TimeS = o.getDouble("s2t").toFloat(),
+                    isValid = o.getBoolean("v"),
+                    invalidReason = if (o.isNull("r")) null else o.getString("r")
+                )
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to parse strides JSON", e)
+            null
+        }
+    }
+
+    private fun parseSelectedIndicesJson(json: String?): List<Int>? {
+        if (json.isNullOrBlank()) return null
+        return try {
+            val arr = JSONArray(json)
+            (0 until arr.length()).map { arr.getInt(it) }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to parse selected indices JSON", e)
+            null
+        }
     }
 
     private fun populateInterAnkleChart(signals: Signals, strides: List<GaitVision.com.gait.Stride>?) {
@@ -437,29 +571,4 @@ class SignalsDashboardActivity : BaseActivity() {
         }
     }
 
-    private fun exportSignals() {
-        val signals = extractedSignals
-        if (signals == null) {
-            Toast.makeText(this, "No signals to export", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        try {
-            val path = GaitCsvExporter.exportSignalsToCSV(
-                context = this,
-                signals = signals,
-                participantId = participantId.toString()
-            )
-
-            if (path != null) {
-                Toast.makeText(this, "Signals exported to Documents", Toast.LENGTH_SHORT).show()
-                Log.d(TAG, "Exported signals to: $path")
-            } else {
-                Toast.makeText(this, "Failed to export signals", Toast.LENGTH_SHORT).show()
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error exporting signals", e)
-            Toast.makeText(this, "Export error: ${e.message}", Toast.LENGTH_SHORT).show()
-        }
-    }
 }

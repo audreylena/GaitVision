@@ -259,7 +259,6 @@ class PatientCreateActivity : BaseActivity() {
 
                     // Go to video picker
                     val intent = Intent(this@PatientCreateActivity, VideoPickerActivity::class.java)
-                    intent.putExtra("patientId", patientId.toInt())
                     intent.putExtra("fromPatientProfile", true)
                     startActivity(intent)
                 }

@@ -206,35 +206,42 @@ class PatientCreateActivity : BaseActivity() {
         val heightInInches = (feet * 12) + inches
 
         lifecycleScope.launch {
-            val patient = if (editingPatientId > 0) {
+            val patientId: Long
+            
+            if (editingPatientId > 0) {
                 // Update existing patient
+                // We must use the Update method to avoid replacing the record and triggering cascade delete
                 val existing = withContext(Dispatchers.IO) {
                     patientDao.getPatientById(editingPatientId)
-                }
-                existing?.copy(
+                } ?: return@launch
+
+                val updatedPatient = existing.copy(
                     firstName = firstName,
                     lastName = lastName,
                     age = age,
                     gender = gender,
                     height = heightInInches,
-                    participantId = editingPatientId // Ensure participantId is passed for update
-                ) ?: return@launch
+                    lastModifiedAt = System.currentTimeMillis()
+                )
+
+                withContext(Dispatchers.IO) {
+                    patientDao.updatePatient(updatedPatient)
+                }
+                
+                patientId = editingPatientId.toLong()
             } else {
                 // Create new patient
-                Patient(
+                val newPatient = Patient(
                     firstName = firstName,
                     lastName = lastName,
                     age = age,
                     gender = gender,
                     height = heightInInches
                 )
-            }
 
-            val patientId = withContext(Dispatchers.IO) {
-                val newId = patientDao.insertPatient(patient)
-                // For a new patient, the newId is the generated participantId
-                // For an update, patient.participantId is already set
-                newId
+                patientId = withContext(Dispatchers.IO) {
+                    patientDao.insertPatient(newPatient)
+                }
             }
 
             withContext(Dispatchers.Main) {
@@ -252,7 +259,6 @@ class PatientCreateActivity : BaseActivity() {
 
                     // Go to video picker
                     val intent = Intent(this@PatientCreateActivity, VideoPickerActivity::class.java)
-                    intent.putExtra("patientId", patientId)
                     intent.putExtra("fromPatientProfile", true)
                     startActivity(intent)
                 }
@@ -262,4 +268,3 @@ class PatientCreateActivity : BaseActivity() {
         }
     }
 }
-

@@ -267,6 +267,4 @@ class PatientCreateActivity : BaseActivity() {
             }
         }
     }
-    }
 }
-

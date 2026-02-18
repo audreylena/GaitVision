@@ -384,7 +384,7 @@ private fun processFrame(frame: Bitmap, frameIndex: Int): Bitmap {
     val poseFrame = processFrameWithMediaPipe(frame, frameIndex)
     val modifiedBitmap = drawOnBitmapMediaPipe(frame, poseFrame)
     if (poseFrame != null) {
-        poseFrames.add(poseFrame)
+        AnalysisSession.poseFrames.add(poseFrame)
     }
     return modifiedBitmap
 }
@@ -484,14 +484,14 @@ suspend fun ProcVidEmpty(context: Context, outputPath: String, activity: AppComp
     val TAG = "ImageProcessing"
     
     // Clear all data
-    poseFrames.clear()
-    frameList.clear()
-    extractedFeatures = null
-    extractionDiagnostics = null
-    scoringResult = null
-    extractedSignals = null
-    
-    if (galleryUri == null) {
+    AnalysisSession.poseFrames.clear()
+    AnalysisSession.frameList.clear()
+    AnalysisSession.extractedFeatures = null
+    AnalysisSession.extractionDiagnostics = null
+    AnalysisSession.scoringResult = null
+    AnalysisSession.extractedSignals = null
+
+    if (AnalysisSession.galleryUri == null) {
         Log.e(TAG, "No video URI provided")
         return null
     }
@@ -515,7 +515,7 @@ suspend fun ProcVidEmpty(context: Context, outputPath: String, activity: AppComp
     val retriever = MediaMetadataRetriever()  // For FPS detection fallback
     
     try {
-        val pfd = context.contentResolver.openFileDescriptor(galleryUri!!, "r")
+        val pfd = context.contentResolver.openFileDescriptor(AnalysisSession.galleryUri!!, "r")
         if (pfd != null) {
             extractor.setDataSource(pfd.fileDescriptor)
             retriever.setDataSource(pfd.fileDescriptor)
@@ -526,8 +526,8 @@ suspend fun ProcVidEmpty(context: Context, outputPath: String, activity: AppComp
     } catch (e: Exception) {
         Log.e(TAG, "Error opening video: ${e.message}")
         try {
-            extractor.setDataSource(context, galleryUri!!, null)
-            retriever.setDataSource(context, galleryUri)
+            extractor.setDataSource(context, AnalysisSession.galleryUri!!, null)
+            retriever.setDataSource(context, AnalysisSession.galleryUri)
         } catch (e2: Exception) {
             Log.e(TAG, "Fallback also failed: ${e2.message}")
             return null
@@ -562,7 +562,7 @@ suspend fun ProcVidEmpty(context: Context, outputPath: String, activity: AppComp
     val videoMime = videoFormat.getString(MediaFormat.KEY_MIME) ?: "video/avc"
     val durationUs = videoFormat.getLong(MediaFormat.KEY_DURATION)
     val videoLengthMs = durationUs / 1000
-    videoLength = durationUs
+    AnalysisSession.videoLength = durationUs
     
     // Detect FPS from format or metadata
     var fps = 30f
@@ -742,15 +742,15 @@ suspend fun ProcVidEmpty(context: Context, outputPath: String, activity: AppComp
     // Hide progress UI
     hideProgressUI(activity)
 
-    Log.d(TAG, "FAST STREAMING complete. Processed $frameIndex frames, ${poseFrames.size} poses detected")
+    Log.d(TAG, "FAST STREAMING complete. Processed $frameIndex frames, ${AnalysisSession.poseFrames.size} poses detected")
     
     // Feature extraction (uses poseFrames which is small)
     extractGaitFeatures(context, width, height, frameIndex, activity)
     
     // Free heavy memory now that processing is done
-    val frameCount = poseFrames.size
-    frameList.clear()
-    poseFrames.clear()
+    val frameCount = AnalysisSession.poseFrames.size
+    AnalysisSession.frameList.clear()
+    AnalysisSession.poseFrames.clear()
     
     // Release reusable YUV conversion buffers
     bitmapCache?.recycle()
@@ -779,25 +779,25 @@ private suspend fun procVidEmptyFallback(context: Context, outputPath: String, a
     
     // Detect video FPS
     detectedFps = withContext(Dispatchers.IO) {
-        detectVideoFps(context, galleryUri)
+        detectVideoFps(context, AnalysisSession.galleryUri)
     }
 
     val retriever = MediaMetadataRetriever()
     try {
-        val pfd = context.contentResolver.openFileDescriptor(galleryUri!!, "r")
+        val pfd = context.contentResolver.openFileDescriptor(AnalysisSession.galleryUri!!, "r")
         if (pfd != null) {
             retriever.setDataSource(pfd.fileDescriptor)
             pfd.close()
         } else {
-            retriever.setDataSource(context, galleryUri)
+            retriever.setDataSource(context, AnalysisSession.galleryUri)
         }
     } catch (e: Exception) {
-        retriever.setDataSource(context, galleryUri)
+        retriever.setDataSource(context, AnalysisSession.galleryUri)
     }
 
     val videoLengthMs = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLong() ?: 0L
     val videoLengthUs = videoLengthMs * 1000L
-    videoLength = videoLengthUs
+    AnalysisSession.videoLength = videoLengthUs
     val frameIntervalUs = (1000000L / detectedFps).toLong()
     val totalFrames = (videoLengthUs / frameIntervalUs).toInt()
 
@@ -876,25 +876,25 @@ private suspend fun extractGaitFeatures(
     totalFrames: Int,
     activity: AppCompatActivity
 ) {
-    Log.d("ImageProcessing", "Starting feature extraction with ${poseFrames.size} pose frames")
-    
-    if (poseFrames.isEmpty()) {
+    Log.d("ImageProcessing", "Starting feature extraction with ${AnalysisSession.poseFrames.size} pose frames")
+
+    if (AnalysisSession.poseFrames.isEmpty()) {
         Log.w("ImageProcessing", "No pose frames collected, skipping feature extraction")
         return
     }
-    
+
     try {
         // Build PoseSequence from collected frames
-        val videoId = galleryUri?.lastPathSegment ?: "unknown"
+        val videoId = AnalysisSession.galleryUri?.lastPathSegment ?: "unknown"
         val fps = detectedFps  // Use detected FPS instead of hardcoded 30
-        
+
         var poseSequence = PoseSequence(
             videoId = videoId,
             fps = fps,
             frameWidth = frameWidth,
             frameHeight = frameHeight,
             numFramesTotal = totalFrames,
-            frames = poseFrames.toList()
+            frames = AnalysisSession.poseFrames.toList()
         )
         
         // Initialize feature extractor with OPTIMAL_CONFIG
@@ -946,21 +946,21 @@ private suspend fun extractGaitFeatures(
             }
         }
         
-        extractedFeatures = features
-        extractionDiagnostics = diagnostics
-        
+        AnalysisSession.extractedFeatures = features
+        AnalysisSession.extractionDiagnostics = diagnostics
+
         if (features != null) {
             Log.d("ImageProcessing", "Feature extraction successful!${if (usedRoi) " (with ROI)" else ""}")
             Log.d("ImageProcessing", "  Cadence: ${features.cadence_spm} spm")
             Log.d("ImageProcessing", "  Stride time: ${features.stride_time_s} s")
             Log.d("ImageProcessing", "  Knee ROM L/R: ${features.knee_left_rom}° / ${features.knee_right_rom}°")
             Log.d("ImageProcessing", "  Valid strides: ${features.valid_stride_count}")
-            
+
             // Compute gait score
             val scorer = GaitScorer(context)
             if (scorer.initialize()) {
-                scoringResult = scorer.score(features)
-                Log.d("ImageProcessing", "Gait scores - AE: ${scoringResult?.aeScore}, Ridge: ${scoringResult?.ridgeScore}, PCA: ${scoringResult?.pcaScore}")
+                AnalysisSession.scoringResult = scorer.score(features)
+                Log.d("ImageProcessing", "Gait scores - AE: ${AnalysisSession.scoringResult?.aeScore}, Ridge: ${AnalysisSession.scoringResult?.ridgeScore}, PCA: ${AnalysisSession.scoringResult?.pcaScore}")
                 scorer.release()
             } else {
                 Log.w("ImageProcessing", "Failed to initialize gait scorer")

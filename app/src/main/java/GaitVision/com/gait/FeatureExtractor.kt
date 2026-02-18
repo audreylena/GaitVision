@@ -2,6 +2,7 @@ package GaitVision.com.gait
 
 import android.util.Log
 import GaitVision.com.enableVerboseLogging
+import GaitVision.com.AnalysisSession
 import GaitVision.com.mediapipe.MediaPipePoseBackend
 import GaitVision.com.mediapipe.PoseFrame
 import GaitVision.com.mediapipe.PoseSequence
@@ -197,10 +198,10 @@ class FeatureExtractor(
         )
         
         // Store signals and strides for visualization
-        GaitVision.com.extractedSignals = signals
-        GaitVision.com.extractedStrides = validatedStrides
-        GaitVision.com.selectedStrideIndices = selectedIndices
-        GaitVision.com.stepSignalMode = stepMode.value
+        AnalysisSession.extractedSignals = signals
+        AnalysisSession.extractedStrides = validatedStrides
+        AnalysisSession.selectedStrideIndices = selectedIndices
+        AnalysisSession.stepSignalMode = stepMode.value
         
         if (features.valid_stride_count == 0) {
             return Pair(null, diagnostics)

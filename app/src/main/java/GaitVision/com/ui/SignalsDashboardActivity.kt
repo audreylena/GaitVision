@@ -20,10 +20,7 @@ import kotlinx.coroutines.withContext
 import GaitVision.com.R
 import GaitVision.com.data.AppDatabase
 import GaitVision.com.data.SignalData
-import GaitVision.com.extractedSignals
-import GaitVision.com.extractedStrides
-import GaitVision.com.selectedStrideIndices
-import GaitVision.com.stepSignalMode
+import GaitVision.com.AnalysisSession
 import GaitVision.com.gait.Signals
 import GaitVision.com.gait.Stride
 import org.json.JSONArray
@@ -215,19 +212,19 @@ class SignalsDashboardActivity : BaseActivity() {
                 return@launch
             }
 
-            // Set globals so all existing code works
-            extractedSignals = buildSignalsFromDb(signalRows)
-            stepSignalMode = result?.stepSignalMode
-            extractedStrides = parseStridesJson(result?.stridesJson)
-            selectedStrideIndices = parseSelectedIndicesJson(result?.selectedStrideIndicesJson)
+            // Populate session so all existing code works
+            AnalysisSession.extractedSignals = buildSignalsFromDb(signalRows)
+            AnalysisSession.stepSignalMode = result?.stepSignalMode
+            AnalysisSession.extractedStrides = parseStridesJson(result?.stridesJson)
+            AnalysisSession.selectedStrideIndices = parseSelectedIndicesJson(result?.selectedStrideIndicesJson)
 
             displaySignals()
         }
     }
 
     private fun displaySignals() {
-        val signals = extractedSignals
-        val strides = extractedStrides
+        val signals = AnalysisSession.extractedSignals
+        val strides = AnalysisSession.extractedStrides
 
         if (signals == null) {
             tvStepMode.text = "No data"
@@ -242,7 +239,7 @@ class SignalsDashboardActivity : BaseActivity() {
         cachedStrides = strides
         populatedCharts.clear()
 
-        tvStepMode.text = stepSignalMode ?: "UNKNOWN"
+        tvStepMode.text = AnalysisSession.stepSignalMode ?: "UNKNOWN"
         tvValidStrides.text = (strides?.count { it.isValid } ?: 0).toString()
 
         val validFrames = signals.isValid.count { it }
@@ -539,7 +536,7 @@ class SignalsDashboardActivity : BaseActivity() {
         // Clear previous limit lines
         chart.xAxis.removeAllLimitLines()
         
-        val selectedIndices = selectedStrideIndices ?: emptyList()
+        val selectedIndices = AnalysisSession.selectedStrideIndices ?: emptyList()
 
         strides.forEachIndexed { idx, stride ->
             val startTime = signals.timestamps.getOrNull(stride.startFrame) ?: return@forEachIndexed

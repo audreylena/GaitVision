@@ -55,6 +55,12 @@ class SignalsDashboardActivity : BaseActivity() {
     private var cachedStrides: List<Stride>? = null
     private val populatedCharts = mutableSetOf<String>()
 
+    // Local state to avoid race conditions with singleton AnalysisSession
+    private var localSignals: Signals? = null
+    private var localStrides: List<Stride>? = null
+    private var localStepMode: String? = null
+    private var localSelectedIndices: List<Int>? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_signals_dashboard)
@@ -190,6 +196,12 @@ class SignalsDashboardActivity : BaseActivity() {
         if (resultId > 0) {
             loadFromDatabase(resultId)
         } else {
+            // Copy from global session to local state (Live analysis path)
+            localSignals = AnalysisSession.extractedSignals
+            localStrides = AnalysisSession.extractedStrides
+            localStepMode = AnalysisSession.stepSignalMode
+            localSelectedIndices = AnalysisSession.selectedStrideIndices
+            
             displaySignals()
         }
     }
@@ -212,19 +224,19 @@ class SignalsDashboardActivity : BaseActivity() {
                 return@launch
             }
 
-            // Populate session so all existing code works
-            AnalysisSession.extractedSignals = buildSignalsFromDb(signalRows)
-            AnalysisSession.stepSignalMode = result?.stepSignalMode
-            AnalysisSession.extractedStrides = parseStridesJson(result?.stridesJson)
-            AnalysisSession.selectedStrideIndices = parseSelectedIndicesJson(result?.selectedStrideIndicesJson)
+            // Populate local state
+            localSignals = buildSignalsFromDb(signalRows)
+            localStepMode = result?.stepSignalMode
+            localStrides = parseStridesJson(result?.stridesJson)
+            localSelectedIndices = parseSelectedIndicesJson(result?.selectedStrideIndicesJson)
 
             displaySignals()
         }
     }
 
     private fun displaySignals() {
-        val signals = AnalysisSession.extractedSignals
-        val strides = AnalysisSession.extractedStrides
+        val signals = localSignals
+        val strides = localStrides
 
         if (signals == null) {
             tvStepMode.text = "No data"
@@ -239,7 +251,7 @@ class SignalsDashboardActivity : BaseActivity() {
         cachedStrides = strides
         populatedCharts.clear()
 
-        tvStepMode.text = AnalysisSession.stepSignalMode ?: "UNKNOWN"
+        tvStepMode.text = localStepMode ?: "UNKNOWN"
         tvValidStrides.text = (strides?.count { it.isValid } ?: 0).toString()
 
         val validFrames = signals.isValid.count { it }
@@ -536,7 +548,7 @@ class SignalsDashboardActivity : BaseActivity() {
         // Clear previous limit lines
         chart.xAxis.removeAllLimitLines()
         
-        val selectedIndices = AnalysisSession.selectedStrideIndices ?: emptyList()
+        val selectedIndices = localSelectedIndices ?: emptyList()
 
         strides.forEachIndexed { idx, stride ->
             val startTime = signals.timestamps.getOrNull(stride.startFrame) ?: return@forEachIndexed

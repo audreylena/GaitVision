@@ -16,12 +16,8 @@ import kotlinx.coroutines.withContext
 import GaitVision.com.R
 import GaitVision.com.data.AnalysisResult
 import GaitVision.com.data.AppDatabase
-import GaitVision.com.participantId
-import GaitVision.com.extractedFeatures
-import GaitVision.com.extractionDiagnostics
-import GaitVision.com.scoringResult
+import GaitVision.com.AnalysisSession
 import GaitVision.com.gait.*
-import GaitVision.com.galleryUri
 
 class ResultsActivity : BaseActivity() {
 
@@ -37,6 +33,13 @@ class ResultsActivity : BaseActivity() {
 
     private var calculatedScore: Double = 0.0
     private var resultId: Long = -1L
+
+    // Local state to avoid race conditions with singleton AnalysisSession
+    private var localFeatures: GaitFeatures? = null
+    private var localDiagnostics: GaitDiagnostics? = null
+    private var localScore: ScoringResult? = null
+    private var localParticipantId: Int = 0
+    private var localVideoUri: Uri? = null
 
     /** SAF file picker for CSV export -- user chooses save location */
     private val csvExportLauncher = registerForActivityResult(
@@ -54,10 +57,17 @@ class ResultsActivity : BaseActivity() {
         resultId = intent.getLongExtra(EXTRA_RESULT_ID, -1L)
 
         if (resultId > 0) {
-            // Load from DB into globals, then display
+            // Load from DB into local state
             loadFromDatabase(resultId)
         } else {
-            // Globals already set from live analysis
+            // Copy from global session to local state (Live analysis path)
+            // We copy immediately so if a new analysis starts in bg, we hold onto these results
+            localFeatures = AnalysisSession.extractedFeatures
+            localDiagnostics = AnalysisSession.extractionDiagnostics
+            localScore = AnalysisSession.scoringResult
+            localParticipantId = AnalysisSession.participantId
+            localVideoUri = AnalysisSession.galleryUri
+            
             calculateGaitScore()
         }
     }
@@ -94,12 +104,8 @@ class ResultsActivity : BaseActivity() {
     }
 
     /**
-     * Load an AnalysisResult from DB and populate the same globals that
-     * the live analysis flow uses. Then call calculateGaitScore() as normal.
-     *
-     * WARNING HEY READ THIS REEEEEEEEAD: This overwrites shared globals (extractedFeatures, scoringResult, etc.).
-     * Safe today because navigation is linear, but a ViewModel/StateFlow refactor
-     * should replace this if we ever need concurrent or comparative analysis views.
+     * Load an AnalysisResult from DB and populate local variables.
+     * Does NOT touch AnalysisSession globals, preventing race conditions.
      */
     private fun loadFromDatabase(id: Long) {
         lifecycleScope.launch {
@@ -113,8 +119,8 @@ class ResultsActivity : BaseActivity() {
                 return@launch
             }
 
-            // Populate globals so all existing code paths work
-            extractedFeatures = GaitFeatures(
+            // Populate local state
+            localFeatures = GaitFeatures(
                 cadence_spm = result.cadenceSpm ?: Float.NaN,
                 stride_time_s = result.strideTimeS ?: Float.NaN,
                 stride_time_cv = result.strideTimeCv ?: Float.NaN,
@@ -134,13 +140,13 @@ class ResultsActivity : BaseActivity() {
                 valid_stride_count = result.validStrideCount
             )
 
-            scoringResult = ScoringResult(
+            localScore = ScoringResult(
                 aeScore = result.aeScore ?: Float.NaN,
                 ridgeScore = result.ridgeScore ?: Float.NaN,
                 pcaScore = result.pcaScore ?: Float.NaN
             )
 
-            extractionDiagnostics = GaitDiagnostics(
+            localDiagnostics = GaitDiagnostics(
                 videoId = result.videoFileName,
                 fpsDetected = result.fpsDetected ?: 30f,
                 durationS = (result.videoLengthMicroseconds ?: 0) / 1_000_000f,
@@ -155,17 +161,18 @@ class ResultsActivity : BaseActivity() {
                 qualityFlag = try { QualityFlag.valueOf(result.qualityFlag ?: "OK") } catch (_: Exception) { QualityFlag.OK }
             )
 
-            participantId = result.patientId
+            localParticipantId = result.patientId
+            // We don't have the original URI for history items usually, checking if we can get it from videoFileName isn't reliable for URI
+            localVideoUri = null 
 
-            // Now just use the same display path
             calculateGaitScore()
         }
     }
 
     private fun calculateGaitScore() {
-        val pcFeatures = extractedFeatures
-        val pcScore = scoringResult
-        val diagnostics = extractionDiagnostics
+        val pcFeatures = localFeatures
+        val pcScore = localScore
+        val diagnostics = localDiagnostics
 
         if (pcFeatures != null && pcScore != null && pcFeatures.valid_stride_count > 0) {
             calculatedScore = pcScore.getScoreForDatabase()
@@ -226,7 +233,7 @@ class ResultsActivity : BaseActivity() {
     }
 
     private fun showFeaturesDialog() {
-        val f = extractedFeatures
+        val f = localFeatures
         if (f == null) {
             Toast.makeText(this, "No features available", Toast.LENGTH_SHORT).show()
             return
@@ -258,16 +265,16 @@ class ResultsActivity : BaseActivity() {
     }
 
     private fun exportCsvFiles() {
-        if (extractionDiagnostics == null) {
+        if (localDiagnostics == null) {
             Toast.makeText(this, "Nothing to export", Toast.LENGTH_SHORT).show()
             return
         }
 
-        val filePrefix = if (participantId == 0) {
+        val filePrefix = if (localParticipantId == 0) {
             val timestamp = java.text.SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", java.util.Locale.US).format(java.util.Date())
             "${timestamp}_0"
         } else {
-            participantId.toString()
+            localParticipantId.toString()
         }
 
         val filename = GaitCsvExporter.generateFilename(filePrefix)
@@ -276,18 +283,18 @@ class ResultsActivity : BaseActivity() {
 
     private fun writeCsvToUri(uri: Uri) {
         try {
-            val diagnostics = extractionDiagnostics ?: return
-            val videoName = galleryUri?.lastPathSegment
+            val diagnostics = localDiagnostics ?: return
+            val videoName = localVideoUri?.lastPathSegment
                 ?: diagnostics.videoId.takeIf { it.isNotBlank() }
                 ?: "unknown"
-            val filePrefix = if (participantId == 0) "0" else participantId.toString()
+            val filePrefix = if (localParticipantId == 0) "0" else localParticipantId.toString()
 
             contentResolver.openOutputStream(uri)?.use { stream ->
                 val success = GaitCsvExporter.writeToStream(
                     outputStream = stream,
-                    features = extractedFeatures,
+                    features = localFeatures,
                     diagnostics = diagnostics,
-                    score = scoringResult,
+                    score = localScore,
                     participantId = filePrefix,
                     videoName = videoName
                 )
@@ -302,5 +309,4 @@ class ResultsActivity : BaseActivity() {
             Toast.makeText(this, "Error exporting: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
-
 }

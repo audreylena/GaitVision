@@ -5,9 +5,7 @@ import android.os.Bundle
 import android.widget.Button
 import android.widget.EditText
 import GaitVision.com.R
-import GaitVision.com.participantId
-import GaitVision.com.participantHeight
-import GaitVision.com.resetAnalysisState
+import GaitVision.com.AnalysisSession
 
 class QuickAnalysisActivity : BaseActivity() {
 
@@ -25,7 +23,7 @@ class QuickAnalysisActivity : BaseActivity() {
     }
 
     private fun resetGlobalState() {
-        resetAnalysisState()
+        AnalysisSession.reset()
     }
 
     private fun initializeViews() {
@@ -85,8 +83,8 @@ class QuickAnalysisActivity : BaseActivity() {
         val inches = etInches.text.toString().trim().toInt()
         val heightInInches = (feet * 12) + inches
 
-        participantId = 0 // Dummy ID for quick analysis
-        participantHeight = heightInInches
+        AnalysisSession.participantId = 0 // Dummy ID for quick analysis
+        AnalysisSession.participantHeight = heightInInches
 
         return true
     }

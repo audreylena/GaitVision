@@ -1,5 +1,8 @@
 package GaitVision.com.gait
 
+import android.os.Parcelable
+import kotlinx.parcelize.Parcelize
+
 /**
  * Gait analysis data models - mirrors PC pipeline for feature parity.
  */
@@ -58,6 +61,7 @@ object GaitConfig {
  * The 16 gait features extracted from pose sequences.
  * Matches PC pipeline FEATURE_COLUMNS exactly.
  */
+@Parcelize
 data class GaitFeatures(
     // Temporal (4)
     val cadence_spm: Float,
@@ -84,7 +88,7 @@ data class GaitFeatures(
     val inter_ankle_cv: Float,
     
     val valid_stride_count: Int
-) {
+) : Parcelable {
     /**
      * Get features as array in FEATURE_COLUMNS order for scoring models.
      */
@@ -167,6 +171,7 @@ enum class QualityFlag {
 /**
  * Diagnostic information about extraction.
  */
+@Parcelize
 data class GaitDiagnostics(
     val videoId: String,
     val fpsDetected: Float,
@@ -181,19 +186,21 @@ data class GaitDiagnostics(
     val wasFlipped: Boolean,
     val qualityFlag: QualityFlag,
     val rejectionReasons: List<String> = emptyList()
-)
+) : Parcelable
 
 /**
  * A single detected step event.
  */
+@Parcelize
 data class StepEvent(
     val frameIdx: Int,
     val timeS: Float
-)
+) : Parcelable
 
 /**
  * A stride (2 consecutive steps).
  */
+@Parcelize
 data class Stride(
     val startFrame: Int,
     val endFrame: Int,
@@ -211,11 +218,12 @@ data class Stride(
     val kneeMaxRight: Float = 0f,
     val validFramePct: Float = 0f,
     val qualityScore: Float = 0f
-)
+) : Parcelable
 
 /**
  * Per-frame signals computed from pose.
  */
+@Parcelize
 data class Signals(
     val timestamps: FloatArray,
     val frameIndices: IntArray,
@@ -248,7 +256,7 @@ data class Signals(
     var ankleLeftVy: FloatArray,
     var ankleRightVy: FloatArray,
     var hipAvgVy: FloatArray
-) {
+) : Parcelable {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (javaClass != other?.javaClass) return false

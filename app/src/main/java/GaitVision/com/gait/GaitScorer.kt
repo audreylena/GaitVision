@@ -1,5 +1,8 @@
 package GaitVision.com.gait
 
+import android.os.Parcelable
+import kotlinx.parcelize.Parcelize
+
 import android.content.Context
 import android.util.Log
 import org.json.JSONObject
@@ -605,11 +608,12 @@ class GaitScorer(private val context: Context) {
  * 
  * For patient database: USE aeScore
  */
+@Parcelize
 data class ScoringResult(
     val aeScore: Float,      // Autoencoder - PRIMARY SCORE FOR DB
     val ridgeScore: Float,   // Ridge regression
     val pcaScore: Float      // PCA reconstruction error
-) {
+) : Parcelable {
     /**
      * Get the score to save to patient database.
      * This is the AE score.

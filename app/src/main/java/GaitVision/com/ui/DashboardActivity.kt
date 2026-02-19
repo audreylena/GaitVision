@@ -47,7 +47,7 @@ class DashboardActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        GaitVision.com.resetAnalysisState()
+        GaitVision.com.AnalysisSession.reset()
         updateGreeting()
     }
 

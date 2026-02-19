@@ -551,7 +551,7 @@ suspend fun ProcVidEmpty(context: Context, outputPath: String, activity: AppComp
         Log.e(TAG, "No video track found")
         extractor.release()
         retriever.release()
-        return galleryUri
+        return AnalysisSession.galleryUri
     }
     
     extractor.selectTrack(videoTrackIndex)
@@ -804,7 +804,7 @@ private suspend fun procVidEmptyFallback(context: Context, outputPath: String, a
     val firstFrame = retriever.getFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST)
     if (firstFrame == null) {
         retriever.release()
-        return galleryUri
+        return AnalysisSession.galleryUri
     }
     
     val width = firstFrame.width
@@ -1003,7 +1003,7 @@ private suspend fun reprocessWithRoiTracking(
     activity: AppCompatActivity
 ): Pair<PoseSequence, List<PoseFrame>>? {
     // BUG: frameList is always empty in fast path - see docstring above
-    if (frameList.isEmpty()) return null
+    if (AnalysisSession.frameList.isEmpty()) return null
     
     val backend = mediaPipeBackend ?: return null
     val roiTracker = GaitVision.com.mediapipe.ROITracker()
@@ -1011,11 +1011,11 @@ private suspend fun reprocessWithRoiTracking(
     val roiPoseFrames = mutableListOf<PoseFrame>()
     var useRoi = false
     var useExpanded = false
-    val listSize = frameList.size
+    val listSize = AnalysisSession.frameList.size
     
-    Log.d("ImageProcessing", "Reprocessing ${frameList.size} frames with ROI tracking...")
+    Log.d("ImageProcessing", "Reprocessing ${AnalysisSession.frameList.size} frames with ROI tracking...")
     
-    for ((frameIndex, frame) in frameList.withIndex()) {
+    for ((frameIndex, frame) in AnalysisSession.frameList.withIndex()) {
         // Update progress UI
         val progress = ((frameIndex + 1) * 100 / listSize)
         withContext(Dispatchers.Main) {
@@ -1097,7 +1097,7 @@ private suspend fun reprocessWithRoiTracking(
     
     if (roiPoseFrames.isEmpty()) return null
     
-    val videoId = galleryUri?.lastPathSegment ?: "unknown"
+    val videoId = AnalysisSession.galleryUri?.lastPathSegment ?: "unknown"
     val roiSequence = PoseSequence(
         videoId = "${videoId}_roi",
         fps = fps,

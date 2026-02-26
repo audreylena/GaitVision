@@ -21,6 +21,13 @@ import androidx.recyclerview.widget.RecyclerView
 import GaitVision.com.R
 import GaitVision.com.data.*
 import GaitVision.com.AnalysisSession
+import com.github.mikephil.charting.charts.LineChart
+import com.github.mikephil.charting.components.XAxis
+import com.github.mikephil.charting.data.Entry
+import com.github.mikephil.charting.data.LineData
+import com.github.mikephil.charting.data.LineDataSet
+import com.github.mikephil.charting.formatter.ValueFormatter
+import android.graphics.Color
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -43,6 +50,7 @@ class PatientProfileActivity : BaseActivity() {
     private lateinit var tvAvgScore: TextView
     private lateinit var rvAnalyses: RecyclerView
     private lateinit var emptyAnalysisState: View
+    private lateinit var progressChart: LineChart
     
     private lateinit var adapter: AnalysisAdapter
     private var patientIdArg: Int = -1
@@ -80,6 +88,9 @@ class PatientProfileActivity : BaseActivity() {
         tvAvgScore = findViewById(R.id.tvAvgScore)
         rvAnalyses = findViewById(R.id.rvAnalyses)
         emptyAnalysisState = findViewById(R.id.emptyAnalysisState)
+        progressChart = findViewById(R.id.progressChart)
+
+        setupChart()
 
         findViewById<ImageButton>(R.id.btnEdit).setOnClickListener {
             val intent = Intent(this, PatientCreateActivity::class.java)
@@ -168,6 +179,82 @@ class PatientProfileActivity : BaseActivity() {
         } else {
             tvAvgScore.text = "—"
         }
+        
+        updateProgressChart(analyses)
+    }
+
+    private fun setupChart() {
+        progressChart.apply {
+            description.isEnabled = false
+            setTouchEnabled(true)
+            isDragEnabled = true
+            setScaleEnabled(true)
+            setPinchZoom(true)
+            setDrawGridBackground(false)
+            
+            // X-Axis
+            xAxis.apply {
+                position = XAxis.XAxisPosition.BOTTOM
+                textColor = Color.WHITE
+                setDrawGridLines(false)
+                granularity = 1f
+                valueFormatter = object : ValueFormatter() {
+                    private val formatter = SimpleDateFormat("MM/dd", Locale.getDefault())
+                    override fun getFormattedValue(value: Float): String {
+                        return formatter.format(Date(value.toLong()))
+                    }
+                }
+            }
+
+            // Y-Axis
+            axisLeft.apply {
+                textColor = Color.WHITE
+                axisMinimum = 0f
+                axisMaximum = 100f
+                setDrawGridLines(true)
+                gridColor = Color.parseColor("#33FFFFFF")
+            }
+            axisRight.isEnabled = false
+            
+            legend.isEnabled = false
+        }
+    }
+
+    private fun updateProgressChart(analyses: List<AnalysisResult>) {
+        val validAnalyses = analyses.filter { it.overallScore != null }.sortedBy { it.recordedAt }
+        
+        if (validAnalyses.size < 2) {
+            // Not enough data to draw a line, hide chart or show empty state
+            progressChart.clear()
+            progressChart.setNoDataText("Complete at least 2 analyses to see progress")
+            progressChart.setNoDataTextColor(Color.GRAY)
+            return
+        }
+
+        val entries = validAnalyses.map {
+            Entry(it.recordedAt.toFloat(), it.overallScore!!.toFloat())
+        }
+
+        val dataSet = LineDataSet(entries, "Overall Score").apply {
+            color = Color.parseColor("#4FC3F7")
+            setCircleColor(Color.parseColor("#4FC3F7"))
+            lineWidth = 3f
+            circleRadius = 5f
+            setDrawCircleHole(true)
+            circleHoleColor = Color.parseColor("#252542")
+            valueTextColor = Color.WHITE
+            valueTextSize = 10f
+            
+            // Format the score text
+            valueFormatter = object : ValueFormatter() {
+                override fun getFormattedValue(value: Float): String {
+                    return value.toInt().toString()
+                }
+            }
+        }
+
+        progressChart.data = LineData(dataSet)
+        progressChart.invalidate() // refresh
     }
 
     private fun startNewAnalysis() {

@@ -43,6 +43,9 @@ object AnalysisSession {
     // Duration of the processed video in microseconds
     var videoLength: Long = 0
 
+    // User selected recording date
+    var recordingDate: Long = System.currentTimeMillis()
+
     /** Clear all session state. */
     fun reset() {
         galleryUri = null
@@ -61,6 +64,7 @@ object AnalysisSession {
         currentPatientId = null
         currentResultId = null
         videoLength = 0
+        recordingDate = System.currentTimeMillis()
     }
 }
 

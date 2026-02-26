@@ -13,6 +13,13 @@ import android.net.Uri
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.PickVisualMediaRequest
 import GaitVision.com.R
+import GaitVision.com.AnalysisSession
+import android.widget.ImageButton
+import android.app.DatePickerDialog
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
+import java.util.Date
 
 class VideoPickerActivity : BaseActivity() {
 
@@ -22,7 +29,11 @@ class VideoPickerActivity : BaseActivity() {
     private lateinit var tvPlaceholder: TextView
     private lateinit var tvStatus: TextView
     private lateinit var btnContinue: Button
-    
+    private lateinit var tvDate: TextView
+    private lateinit var btnEditDate: ImageButton
+
+    private var selectedDateMillis: Long = System.currentTimeMillis()
+    private val dateFormat = SimpleDateFormat("MMM d, yyyy", Locale.getDefault())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -33,6 +44,8 @@ class VideoPickerActivity : BaseActivity() {
         tvPlaceholder = findViewById(R.id.tvPlaceholder)
         tvStatus = findViewById(R.id.tvStatus)
         btnContinue = findViewById(R.id.btnContinue)
+        tvDate = findViewById(R.id.tvDate)
+        btnEditDate = findViewById(R.id.btnEditDate)
 
         setupCommonHeader("Select Video")
         setupButtons()
@@ -85,8 +98,16 @@ class VideoPickerActivity : BaseActivity() {
             startActivity(recordIntent)
         }
 
+        // Initialize display date
+        updateDateDisplay()
+
+        btnEditDate.setOnClickListener {
+            showDatePicker()
+        }
+
         btnContinue.setOnClickListener {
             selectedVideo?.let { uri ->
+                AnalysisSession.recordingDate = selectedDateMillis
                 val shouldSave = intent.getBooleanExtra(AnalysisActivity.EXTRA_SHOULD_SAVE, true)
                 val analysisIntent = Intent(this, AnalysisActivity::class.java).apply {
                     data = uri
@@ -98,5 +119,44 @@ class VideoPickerActivity : BaseActivity() {
                 Toast.makeText(this, "Please select a video first", Toast.LENGTH_SHORT).show()
             }
         }
+    }
+
+    private fun showDatePicker() {
+        val calendar = Calendar.getInstance().apply { timeInMillis = selectedDateMillis }
+        val year = calendar.get(Calendar.YEAR)
+        val month = calendar.get(Calendar.MONTH)
+        val dayOfMonth = calendar.get(Calendar.DAY_OF_MONTH)
+
+        val datePickerDialog = DatePickerDialog(
+            this,
+            { _, selectedYear, selectedMonth, selectedDay ->
+                val selectedCalendar = Calendar.getInstance()
+                // Keep the time as current time, just change date
+                selectedCalendar.set(selectedYear, selectedMonth, selectedDay)
+                selectedDateMillis = selectedCalendar.timeInMillis
+                updateDateDisplay()
+            },
+            year,
+            month,
+            dayOfMonth
+        )
+        // Ensure user can't select future dates
+        datePickerDialog.datePicker.maxDate = System.currentTimeMillis()
+        datePickerDialog.show()
+    }
+
+    private fun updateDateDisplay() {
+        if (isToday(selectedDateMillis)) {
+            tvDate.text = "Today"
+        } else {
+            tvDate.text = dateFormat.format(Date(selectedDateMillis))
+        }
+    }
+
+    private fun isToday(inTimeMillis: Long): Boolean {
+        val calendarTarget = Calendar.getInstance().apply { timeInMillis = inTimeMillis }
+        val calendarToday = Calendar.getInstance()
+        return calendarTarget.get(Calendar.YEAR) == calendarToday.get(Calendar.YEAR) &&
+               calendarTarget.get(Calendar.DAY_OF_YEAR) == calendarToday.get(Calendar.DAY_OF_YEAR)
     }
 }

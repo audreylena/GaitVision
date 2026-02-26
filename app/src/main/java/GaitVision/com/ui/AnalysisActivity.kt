@@ -223,7 +223,7 @@ class AnalysisActivity : BaseActivity() {
                     patientId = AnalysisSession.currentPatientId!!,
                     videoFileName = videoName,
                     videoLengthMicroseconds = AnalysisSession.videoLength,
-                    recordedAt = System.currentTimeMillis(),
+                    recordedAt = AnalysisSession.recordingDate,
 
                     // Scores
                     overallScore = score?.getScoreForDatabase(),

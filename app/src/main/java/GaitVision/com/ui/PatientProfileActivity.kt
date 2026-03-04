@@ -15,6 +15,7 @@ import com.google.android.material.floatingactionbutton.ExtendedFloatingActionBu
 import GaitVision.com.data.*
 import GaitVision.com.AnalysisSession
 import com.github.mikephil.charting.charts.LineChart
+import com.github.mikephil.charting.components.LimitLine
 import com.github.mikephil.charting.components.XAxis
 import com.github.mikephil.charting.data.Entry
 import com.github.mikephil.charting.data.LineData
@@ -175,7 +176,7 @@ class PatientProfileActivity : BaseActivity() {
             setScaleEnabled(true)
             setPinchZoom(true)
             setDrawGridBackground(false)
-            
+
             // X-Axis
             xAxis.apply {
                 position = XAxis.XAxisPosition.BOTTOM
@@ -190,25 +191,48 @@ class PatientProfileActivity : BaseActivity() {
                 }
             }
 
-            // Y-Axis
+            // Y-Axis with reference band lines
             axisLeft.apply {
                 textColor = Color.WHITE
                 axisMinimum = 0f
                 axisMaximum = 100f
                 setDrawGridLines(true)
-                gridColor = Color.parseColor("#33FFFFFF")
+                gridColor = Color.parseColor("#22FFFFFF")
+
+                // --- Reference band borders ---
+                removeAllLimitLines()
+
+                // Upper border: Good zone (≥ 80)
+                addLimitLine(LimitLine(80f, "Good").apply {
+                    lineWidth = 1.5f
+                    lineColor = Color.parseColor("#4CAF50")
+                    enableDashedLine(10f, 6f, 0f)
+                    textColor = Color.parseColor("#4CAF50")
+                    textSize = 9f
+                    labelPosition = LimitLine.LimitLabelPosition.RIGHT_TOP
+                })
+
+                // Mid border: Fair zone (60–79)
+                addLimitLine(LimitLine(60f, "Fair").apply {
+                    lineWidth = 1.5f
+                    lineColor = Color.parseColor("#FF9800")
+                    enableDashedLine(10f, 6f, 0f)
+                    textColor = Color.parseColor("#FF9800")
+                    textSize = 9f
+                    labelPosition = LimitLine.LimitLabelPosition.RIGHT_TOP
+                })
+
+                setDrawLimitLinesBehindData(true)   // bands sit behind the score line
             }
             axisRight.isEnabled = false
-            
             legend.isEnabled = false
         }
     }
 
     private fun updateProgressChart(analyses: List<AnalysisResult>) {
         val validAnalyses = analyses.filter { it.overallScore != null }.sortedBy { it.recordedAt }
-        
+
         if (validAnalyses.size < 2) {
-            // Not enough data to draw a line, hide chart or show empty state
             progressChart.clear()
             progressChart.setNoDataText("Complete at least 2 analyses to see progress")
             progressChart.setNoDataTextColor(Color.GRAY)
@@ -219,26 +243,32 @@ class PatientProfileActivity : BaseActivity() {
             Entry(it.recordedAt.toFloat(), it.overallScore!!.toFloat())
         }
 
+        // Line color reflects the most recent score zone
+        val latestScore = validAnalyses.last().overallScore ?: 0.0
+        val zoneColor = when {
+            latestScore >= 80 -> Color.parseColor("#4CAF50")   // green — Good
+            latestScore >= 60 -> Color.parseColor("#FF9800")   // amber — Fair
+            else              -> Color.parseColor("#FF5252")   // red   — Needs Attention
+        }
+
         val dataSet = LineDataSet(entries, "Overall Score").apply {
-            color = Color.parseColor("#4FC3F7")
-            setCircleColor(Color.parseColor("#4FC3F7"))
+            color = zoneColor
+            setCircleColor(zoneColor)
             lineWidth = 3f
             circleRadius = 5f
             setDrawCircleHole(true)
             circleHoleColor = Color.parseColor("#252542")
             valueTextColor = Color.WHITE
             valueTextSize = 10f
-            
-            // Format the score text
+            setDrawFilled(false)
             valueFormatter = object : ValueFormatter() {
-                override fun getFormattedValue(value: Float): String {
-                    return value.toInt().toString()
-                }
+                override fun getFormattedValue(value: Float): String =
+                    value.toInt().toString()
             }
         }
 
         progressChart.data = LineData(dataSet)
-        progressChart.invalidate() // refresh
+        progressChart.invalidate()
     }
 
     private fun startNewAnalysis() {

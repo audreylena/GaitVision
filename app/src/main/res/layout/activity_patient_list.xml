@@ -122,7 +122,7 @@
         android:layout_height="40dp"
         android:layout_below="@id/filterChips"
         android:orientation="horizontal"
-        android:background="#252542"
+        android:background="@color/card_surface_dark"
         android:gravity="center_vertical"
         android:paddingStart="12dp"
         android:paddingEnd="12dp">
@@ -241,7 +241,7 @@
         android:layout_alignParentEnd="true"
         android:layout_margin="16dp"
         android:src="@android:drawable/ic_input_add"
-        app:backgroundTint="#4CAF50"
+        app:backgroundTint="@color/icon_green"
         app:tint="#FFFFFF"
         android:contentDescription="Add Patient" />
 

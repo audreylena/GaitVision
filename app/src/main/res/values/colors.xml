@@ -25,6 +25,9 @@
     <color name="accent_rose">#FFF43F5E</color>
     <color name="accent_red">#FFF43F5E</color>
     <color name="accent_purple">#FF8B5CF6</color>
+    <color name="icon_purple">#FF9C27B0</color>
+    <color name="icon_green">#FF4CAF50</color>
+    <color name="icon_light_blue">#FF4FC3F7</color>
     
     <!-- Background Gradients -->
     <color name="background_gradient_start">#FFF8FAFC</color>

@@ -5,7 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
-import android.widget.Button
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -81,22 +81,15 @@ class ResultsActivity : BaseActivity() {
     }
 
     private fun setupButtons() {
-        findViewById<Button>(R.id.btnMainMenu).setOnClickListener {
-            val intent = Intent(this, DashboardActivity::class.java)
-            intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
-            startActivity(intent)
-            finish()
-        }
-
-        findViewById<Button>(R.id.btnExportCsv).setOnClickListener {
+        findViewById<LinearLayout>(R.id.btnExportCsv).setOnClickListener {
             exportCsvFiles()
         }
 
-        findViewById<Button>(R.id.btnViewFeatures).setOnClickListener {
+        findViewById<LinearLayout>(R.id.btnViewFeatures).setOnClickListener {
             showFeaturesDialog()
         }
 
-        findViewById<Button>(R.id.btnSignalsDashboard).setOnClickListener {
+        findViewById<LinearLayout>(R.id.btnSignalsDashboard).setOnClickListener {
             val intent = Intent(this, SignalsDashboardActivity::class.java)
             if (resultId > 0) intent.putExtra(EXTRA_RESULT_ID, resultId)
             startActivity(intent)

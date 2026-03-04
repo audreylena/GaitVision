@@ -4,7 +4,7 @@ import android.graphics.Color
 import android.os.Bundle
 import android.util.Log
 import android.view.View
-import android.widget.Button
+import android.widget.LinearLayout
 import android.widget.PopupMenu
 import android.widget.TextView
 import android.widget.Toast
@@ -41,7 +41,7 @@ class SignalsDashboardActivity : BaseActivity() {
     private lateinit var tvValidStrides: TextView
     private lateinit var tvFrameValidity: TextView
     private lateinit var tvLegend: TextView
-    private lateinit var btnSelectSignal: Button
+    private lateinit var btnSelectSignal: LinearLayout
 
     private lateinit var chartInterAnkle: LineChart
     private lateinit var chartKneeAngles: LineChart
@@ -136,7 +136,8 @@ class SignalsDashboardActivity : BaseActivity() {
                 5 -> showChart("HIP_Y", "Hip Y Positions")
                 6 -> showChart("TRUNK", "Trunk Angle")
             }
-            btnSelectSignal.text = item.title
+            // Update the signal selector label in the row
+            (btnSelectSignal.getChildAt(1) as? TextView)?.text = item.title
             updateLegend(item.itemId)
             true
         }

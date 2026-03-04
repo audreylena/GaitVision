@@ -109,6 +109,14 @@
             android:parentActivityName="GaitVision.com.ui.PatientProfileActivity"
             tools:ignore="DiscouragedApi,LockedOrientationActivity" />
 
+        <activity
+            android:name="GaitVision.com.ui.ProgressOverTimeActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.GaitVision"
+            android:parentActivityName="GaitVision.com.ui.PatientProfileActivity"
+            tools:ignore="DiscouragedApi,LockedOrientationActivity" />
+
         <!-- Utility Activities -->
         <activity
             android:name="GaitVision.com.ui.HelpActivity"

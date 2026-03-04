@@ -276,6 +276,30 @@
             </LinearLayout>
         </androidx.cardview.widget.CardView>
 
+        <!-- Progress section footer -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="end"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:layout_marginBottom="20dp"
+            android:layout_marginTop="-4dp">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnViewProgress"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:text="View Full Progress"
+                android:textColor="#4FC3F7"
+                android:textSize="13sp"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                app:strokeColor="#4FC3F7"
+                app:strokeWidth="1dp"
+                app:cornerRadius="8dp" />
+
+        </LinearLayout>
 
         <!-- Analysis History Section -->
         <LinearLayout

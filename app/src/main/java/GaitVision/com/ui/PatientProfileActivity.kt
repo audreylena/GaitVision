@@ -97,6 +97,10 @@ class PatientProfileActivity : BaseActivity() {
         findViewById<MaterialButton>(R.id.btnViewHistory).setOnClickListener {
             openAnalysisHistory()
         }
+
+        findViewById<MaterialButton>(R.id.btnViewProgress).setOnClickListener {
+            openProgressView()
+        }
     }
 
     /**
@@ -151,6 +155,14 @@ class PatientProfileActivity : BaseActivity() {
         val intent = Intent(this, AnalysisHistoryActivity::class.java)
         intent.putExtra(AnalysisHistoryActivity.EXTRA_PATIENT_ID, patientIdArg)
         intent.putExtra(AnalysisHistoryActivity.EXTRA_PATIENT_NAME, patient.fullName)
+        startActivity(intent)
+    }
+
+    private fun openProgressView() {
+        val patient = currentPatient ?: return
+        val intent = Intent(this, ProgressOverTimeActivity::class.java)
+        intent.putExtra(ProgressOverTimeActivity.EXTRA_PATIENT_ID, patientIdArg)
+        intent.putExtra(ProgressOverTimeActivity.EXTRA_PATIENT_NAME, patient.fullName)
         startActivity(intent)
     }
 

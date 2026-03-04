@@ -101,6 +101,14 @@
             android:parentActivityName="GaitVision.com.ui.PatientListActivity"
             tools:ignore="DiscouragedApi,LockedOrientationActivity" />
 
+        <activity
+            android:name="GaitVision.com.ui.AnalysisHistoryActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.GaitVision"
+            android:parentActivityName="GaitVision.com.ui.PatientProfileActivity"
+            tools:ignore="DiscouragedApi,LockedOrientationActivity" />
+
         <!-- Utility Activities -->
         <activity
             android:name="GaitVision.com.ui.HelpActivity"

@@ -3,17 +3,14 @@ package GaitVision.com.ui
 import android.app.AlertDialog
 import android.content.Intent
 import android.os.Bundle
-import android.view.LayoutInflater
-import android.view.View
-import android.widget.Button
 import android.widget.ImageButton
-import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import GaitVision.com.R
+import com.google.android.material.button.MaterialButton
 import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
 import GaitVision.com.data.*
 import GaitVision.com.AnalysisSession
@@ -44,15 +41,10 @@ class PatientProfileActivity : BaseActivity() {
     private lateinit var tvCreatedAt: TextView
     private lateinit var tvTotalAnalyses: TextView
     private lateinit var tvAvgScore: TextView
-    private lateinit var analysisListContainer: LinearLayout
-    private lateinit var emptyAnalysisState: View
     private lateinit var progressChart: LineChart
     private val dateFormat = SimpleDateFormat("MMM d, yyyy \u2022 h:mm a", Locale.getDefault())
     private var patientIdArg: Int = -1
     private var currentPatient: Patient? = null
-
-    private var allAnalyses: List<AnalysisResult> = emptyList()
-    private var isShowingAllAnalyses = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -83,8 +75,6 @@ class PatientProfileActivity : BaseActivity() {
         tvCreatedAt = findViewById(R.id.tvCreatedAt)
         tvTotalAnalyses = findViewById(R.id.tvTotalAnalyses)
         tvAvgScore = findViewById(R.id.tvAvgScore)
-        analysisListContainer = findViewById(R.id.analysisListContainer)
-        emptyAnalysisState = findViewById(R.id.emptyAnalysisState)
         progressChart = findViewById(R.id.progressChart)
 
         setupChart()
@@ -103,10 +93,8 @@ class PatientProfileActivity : BaseActivity() {
             startNewAnalysis()
         }
 
-        val tvViewAll = findViewById<TextView>(R.id.tvViewAll)
-        tvViewAll.setOnClickListener {
-            isShowingAllAnalyses = !isShowingAllAnalyses
-            updateAnalysisListUI()
+        findViewById<MaterialButton>(R.id.btnViewHistory).setOnClickListener {
+            openAnalysisHistory()
         }
     }
 
@@ -154,85 +142,15 @@ class PatientProfileActivity : BaseActivity() {
     }
 
     private fun updateAnalysisList(analyses: List<AnalysisResult>) {
-        allAnalyses = analyses
-        updateAnalysisListUI()
+        updateStats(analyses)
     }
 
-    private fun updateAnalysisListUI() {
-        val tvViewAll = findViewById<TextView>(R.id.tvViewAll)
-        analysisListContainer.removeAllViews()
-
-        if (allAnalyses.isEmpty()) {
-            analysisListContainer.visibility = View.GONE
-            emptyAnalysisState.visibility = View.VISIBLE
-            tvViewAll.visibility = View.GONE
-        } else {
-            analysisListContainer.visibility = View.VISIBLE
-            emptyAnalysisState.visibility = View.GONE
-
-            val displayList = if (allAnalyses.size > 1) {
-                tvViewAll.visibility = View.VISIBLE
-                if (isShowingAllAnalyses) {
-                    tvViewAll.text = "Show Less \u2191"
-                    allAnalyses
-                } else {
-                    tvViewAll.text = "View All \u2192"
-                    allAnalyses.take(1)
-                }
-            } else {
-                tvViewAll.visibility = View.GONE
-                allAnalyses
-            }
-
-            for (result in displayList) {
-                val cardView = LayoutInflater.from(this)
-                    .inflate(R.layout.item_analysis_card, analysisListContainer, false)
-                bindAnalysisCard(cardView, result)
-                analysisListContainer.addView(cardView)
-            }
-        }
-    }
-
-    private fun bindAnalysisCard(view: View, result: AnalysisResult) {
-        view.findViewById<TextView>(R.id.tvDate).text = dateFormat.format(Date(result.recordedAt))
-
-        val score = result.overallScore
-        val tvScore = view.findViewById<TextView>(R.id.tvScore)
-        val scoreContainer = view.findViewById<View>(R.id.scoreContainer)
-        val tvLeftKnee = view.findViewById<TextView>(R.id.tvLeftKnee)
-        val tvRightKnee = view.findViewById<TextView>(R.id.tvRightKnee)
-        val tvLeftHip = view.findViewById<TextView>(R.id.tvLeftHip)
-        val tvRightHip = view.findViewById<TextView>(R.id.tvRightHip)
-        val tvTorso = view.findViewById<TextView>(R.id.tvTorso)
-
-        if (score != null) {
-            tvScore.text = score.toInt().toString()
-            scoreContainer.setBackgroundResource(
-                when {
-                    score >= 80 -> R.drawable.score_badge_background
-                    score >= 60 -> R.drawable.badge_background
-                    else -> R.drawable.button_outline_background
-                }
-            )
-            tvLeftKnee.text = result.kneeLeftRom?.let { "${it.toInt()}\u00B0" } ?: "\u2014"
-            tvRightKnee.text = result.kneeRightRom?.let { "${it.toInt()}\u00B0" } ?: "\u2014"
-            tvLeftHip.text = result.ldjHip?.let { String.format("%.2f", it) } ?: "\u2014"
-            tvRightHip.text = "\u2014"
-            tvTorso.text = result.trunkLeanStdDeg?.let { "${it.toInt()}\u00B0" } ?: "\u2014"
-        } else {
-            tvScore.text = "\u2014"
-            tvLeftKnee.text = "\u2014"
-            tvRightKnee.text = "\u2014"
-            tvLeftHip.text = "\u2014"
-            tvRightHip.text = "\u2014"
-            tvTorso.text = "\u2014"
-        }
-
-        view.findViewById<Button>(R.id.btnViewCharts).setOnClickListener {
-            val intent = Intent(this, ResultsActivity::class.java)
-            intent.putExtra(ResultsActivity.EXTRA_RESULT_ID, result.id)
-            startActivity(intent)
-        }
+    private fun openAnalysisHistory() {
+        val patient = currentPatient ?: return
+        val intent = Intent(this, AnalysisHistoryActivity::class.java)
+        intent.putExtra(AnalysisHistoryActivity.EXTRA_PATIENT_ID, patientIdArg)
+        intent.putExtra(AnalysisHistoryActivity.EXTRA_PATIENT_NAME, patient.fullName)
+        startActivity(intent)
     }
 
     private fun updateStats(analyses: List<AnalysisResult>) {

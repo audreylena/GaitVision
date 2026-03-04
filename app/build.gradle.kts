@@ -92,4 +92,7 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     kapt(libs.androidx.room.compiler)
 
+    // Kotlin reflection (used by AnalysisHistoryActivity to dynamically build table columns)
+    implementation(kotlin("reflect"))
+
 }

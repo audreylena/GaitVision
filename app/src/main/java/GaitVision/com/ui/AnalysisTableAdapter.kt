@@ -8,6 +8,7 @@ import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
+import GaitVision.com.R
 import GaitVision.com.data.AnalysisResult
 
 /**
@@ -37,14 +38,18 @@ class AnalysisTableAdapter(
             setPadding(0, (10 * density).toInt(), 0, (10 * density).toInt())
             isClickable = true
             isFocusable = true
-            setBackgroundResource(android.R.drawable.list_selector_background)
+            // Use the theme's ripple instead of the deprecated list_selector_background
+            with(android.util.TypedValue()) {
+                context.theme.resolveAttribute(android.R.attr.selectableItemBackground, this, true)
+                setBackgroundResource(resourceId)
+            }
         }
 
         // Create one TextView per column (plus "View Results" action cell)
         columns.forEach { col ->
             val tv = TextView(parent.context).apply {
                 textSize = 13f
-                setTextColor(Color.WHITE)
+                setTextColor(ContextCompat.getColor(parent.context, R.color.text_white))
                 gravity = Gravity.CENTER
                 minWidth = (col.minWidthDp * density).toInt()
                 setPadding(
@@ -104,7 +109,7 @@ class AnalysisTableAdapter(
                     else          -> ContextCompat.getColor(ctx, R.color.score_poor)
                 })
             } else {
-                tv.setTextColor(Color.WHITE)
+                tv.setTextColor(ContextCompat.getColor(tv.context, R.color.text_white))
             }
         }
 

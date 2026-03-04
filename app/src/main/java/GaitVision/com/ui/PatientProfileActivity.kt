@@ -189,7 +189,7 @@ class PatientProfileActivity : BaseActivity() {
 
             xAxis.apply {
                 position = XAxis.XAxisPosition.BOTTOM
-                textColor = Color.WHITE
+                textColor = ContextCompat.getColor(this@PatientProfileActivity, R.color.text_white)
                 setDrawGridLines(false)
                 granularity = 1f
                 valueFormatter = object : ValueFormatter() {
@@ -200,7 +200,7 @@ class PatientProfileActivity : BaseActivity() {
             }
 
             axisLeft.apply {
-                textColor = Color.WHITE
+                textColor = ContextCompat.getColor(this@PatientProfileActivity, R.color.text_white)
                 axisMinimum = 0f
                 axisMaximum = 100f
                 setDrawGridLines(true)
@@ -249,7 +249,7 @@ class PatientProfileActivity : BaseActivity() {
             circleRadius = 5f
             setDrawCircleHole(true)
             circleHoleColor = ContextCompat.getColor(this@PatientProfileActivity, R.color.table_row_odd)
-            valueTextColor = Color.WHITE
+            valueTextColor = ContextCompat.getColor(this@PatientProfileActivity, R.color.text_white)
             valueTextSize = 10f
             setDrawFilled(false)
             valueFormatter = object : ValueFormatter() {

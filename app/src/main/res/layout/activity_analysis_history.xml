@@ -66,9 +66,9 @@
         <ImageView
             android:layout_width="64dp"
             android:layout_height="64dp"
-            android:src="@android:drawable/ic_menu_recent_history"
+            android:src="@drawable/baseline_history_24"
             android:alpha="0.4"
-            app:tint="#888888" />
+            app:tint="@color/chart_axis_text" />
 
         <TextView
             android:layout_width="wrap_content"

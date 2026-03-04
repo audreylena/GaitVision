@@ -35,7 +35,7 @@ class AnalysisHistoryActivity : BaseActivity() {
 
     // ── Metadata fields we intentionally skip (non-feature data) ──────────────
     private val SKIP_FIELDS = setOf(
-        "id", "patientId", "recordedAt", "videoFileName",
+        "id", "patientId", "videoFileName",
         "videoLengthMicroseconds", "stepSignalMode", "qualityFlag",
         "walkingDirection", "wasFlipped", "stridesJson", "selectedStrideIndicesJson"
     )
@@ -61,9 +61,9 @@ class AnalysisHistoryActivity : BaseActivity() {
         /** Format a nullable Number nicely */
         private fun fmt(value: Any?): String = when (value) {
             null -> "—"
-            is Float  -> if (value == value.toLong().toFloat()) value.toLong().toString()
+            is Float  -> if (value % 1.0f == 0.0f) value.toLong().toString()
                          else String.format("%.2f", value)
-            is Double -> if (value == value.toLong().toDouble()) value.toLong().toString()
+            is Double -> if (value % 1.0 == 0.0) value.toLong().toString()
                          else String.format("%.2f", value)
             is Boolean -> if (value) "Yes" else "No"
             else -> value.toString()

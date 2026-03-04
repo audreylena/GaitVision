@@ -155,7 +155,7 @@ class VideoPickerActivity : BaseActivity() {
 
     private fun updateDateDisplay() {
         if (isToday(selectedDateMillis)) {
-            tvDate.text = "Today"
+            tvDate.text = getString(R.string.label_date_today)
         } else {
             tvDate.text = dateFormat.format(Date(selectedDateMillis))
         }

@@ -155,7 +155,7 @@ class ProgressOverTimeActivity : BaseActivity() {
         // ── Title ─────────────────────────────────────────────────────────────
         inner.addView(TextView(this).apply {
             text = metric.label
-            setTextColor(Color.WHITE)
+            setTextColor(ContextCompat.getColor(this@ProgressOverTimeActivity, R.color.text_white))
             textSize = 14f
             typeface = android.graphics.Typeface.DEFAULT_BOLD
             layoutParams = LinearLayout.LayoutParams(
@@ -253,7 +253,7 @@ class ProgressOverTimeActivity : BaseActivity() {
                 circleRadius    = 4f
                 setDrawCircleHole(true)
                 circleHoleColor = ContextCompat.getColor(this@ProgressOverTimeActivity, R.color.table_row_odd)
-                valueTextColor  = Color.WHITE
+                valueTextColor  = ContextCompat.getColor(this@ProgressOverTimeActivity, R.color.text_white)
                 valueTextSize   = 9f
                 setDrawFilled(false)
                 valueFormatter = object : ValueFormatter() {

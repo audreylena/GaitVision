@@ -32,7 +32,7 @@
                 android:layout_marginEnd="16dp"
                 android:layout_marginBottom="12dp"
                 app:cardCornerRadius="16dp"
-                app:cardBackgroundColor="#252542"
+                app:cardBackgroundColor="@color/card_surface_dark"
                 app:cardElevation="4dp">
 
                 <LinearLayout
@@ -260,7 +260,7 @@
                 android:layout_marginEnd="16dp"
                 android:layout_marginBottom="12dp"
                 app:cardCornerRadius="12dp"
-                app:cardBackgroundColor="#252542"
+                app:cardBackgroundColor="@color/card_surface_dark"
                 app:cardElevation="2dp">
 
                 <LinearLayout
@@ -288,7 +288,7 @@
                 android:layout_marginEnd="16dp"
                 android:layout_marginBottom="16dp"
                 app:cardCornerRadius="16dp"
-                app:cardBackgroundColor="#252542"
+                app:cardBackgroundColor="@color/card_surface_dark"
                 app:cardElevation="3dp">
 
                 <LinearLayout
@@ -313,7 +313,7 @@
                             android:layout_width="22dp"
                             android:layout_height="22dp"
                             android:src="@drawable/ic_movie_24"
-                            app:tint="#4CAF50"
+                            app:tint="@color/icon_green"
                             android:layout_marginEnd="16dp" />
 
                         <TextView
@@ -329,7 +329,7 @@
                             android:layout_width="18dp"
                             android:layout_height="18dp"
                             android:src="@drawable/ic_chevron_right"
-                            app:tint="#4CAF50" />
+                            app:tint="@color/icon_green" />
                     </LinearLayout>
 
                     <!-- Divider -->
@@ -355,7 +355,7 @@
                             android:layout_width="22dp"
                             android:layout_height="22dp"
                             android:src="@drawable/baseline_history_24"
-                            app:tint="#4FC3F7"
+                            app:tint="@color/icon_light_blue"
                             android:layout_marginEnd="16dp" />
 
                         <TextView
@@ -371,7 +371,7 @@
                             android:layout_width="18dp"
                             android:layout_height="18dp"
                             android:src="@drawable/ic_chevron_right"
-                            app:tint="#4FC3F7" />
+                            app:tint="@color/icon_light_blue" />
                     </LinearLayout>
 
                     <!-- Divider -->
@@ -397,7 +397,7 @@
                             android:layout_width="22dp"
                             android:layout_height="22dp"
                             android:src="@drawable/ic_show_chart_24"
-                            app:tint="#4FC3F7"
+                            app:tint="@color/icon_light_blue"
                             android:layout_marginEnd="16dp" />
 
                         <TextView
@@ -413,7 +413,7 @@
                             android:layout_width="18dp"
                             android:layout_height="18dp"
                             android:src="@drawable/ic_chevron_right"
-                            app:tint="#4FC3F7" />
+                            app:tint="@color/icon_light_blue" />
                     </LinearLayout>
 
                     <!-- Divider -->

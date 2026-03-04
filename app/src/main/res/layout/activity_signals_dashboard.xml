@@ -67,7 +67,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="0"
-                    android:textColor="#4CAF50"
+                    android:textColor="@color/icon_green"
                     android:textSize="14sp"
                     android:textStyle="bold" />
 
@@ -109,7 +109,7 @@
         android:layout_marginHorizontal="16dp"
         android:layout_marginBottom="8dp"
         app:cardCornerRadius="12dp"
-        app:cardBackgroundColor="#252542"
+        app:cardBackgroundColor="@color/card_surface_dark"
         app:cardElevation="2dp">
 
         <LinearLayout
@@ -128,7 +128,7 @@
                 android:layout_width="20dp"
                 android:layout_height="20dp"
                 android:src="@drawable/ic_bar_chart_24"
-                app:tint="#9C27B0"
+                app:tint="@color/icon_purple"
                 android:layout_marginEnd="12dp" />
 
             <TextView

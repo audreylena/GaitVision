@@ -41,7 +41,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Loading..."
-                android:textColor="#4FC3F7"
+                android:textColor="@color/icon_light_blue"
                 android:textSize="24sp"
                 android:textStyle="bold"
                 android:layout_marginTop="4dp" />
@@ -257,7 +257,7 @@
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
             app:cardCornerRadius="16dp"
-            app:cardBackgroundColor="#252542"
+            app:cardBackgroundColor="@color/card_surface_dark"
             app:cardElevation="3dp">
 
             <LinearLayout
@@ -282,7 +282,7 @@
                         android:layout_width="22dp"
                         android:layout_height="22dp"
                         android:src="@drawable/ic_check_24"
-                        app:tint="#4CAF50"
+                        app:tint="@color/icon_green"
                         android:layout_marginEnd="16dp" />
 
                     <TextView
@@ -319,7 +319,7 @@
                         android:layout_width="22dp"
                         android:layout_height="22dp"
                         android:src="@drawable/ic_science_24"
-                        app:tint="#9C27B0"
+                        app:tint="@color/icon_purple"
                         android:layout_marginEnd="16dp" />
 
                     <TextView

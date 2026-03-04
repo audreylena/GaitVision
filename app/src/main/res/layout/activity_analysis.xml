@@ -56,7 +56,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="Video ready for analysis"
-                    android:textColor="#4CAF50"
+                    android:textColor="@color/icon_green"
                     android:textSize="14sp" />
 
             </LinearLayout>
@@ -70,7 +70,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
             app:cardCornerRadius="16dp"
-            app:cardBackgroundColor="#252542"
+            app:cardBackgroundColor="@color/card_surface_dark"
             app:cardElevation="3dp">
 
             <LinearLayout
@@ -89,7 +89,7 @@
                     android:layout_width="22dp"
                     android:layout_height="22dp"
                     android:src="@drawable/ic_science_24"
-                    app:tint="#9C27B0"
+                    app:tint="@color/icon_purple"
                     android:layout_marginEnd="16dp" />
 
                 <TextView
@@ -130,7 +130,7 @@
             style="@android:style/Widget.ProgressBar.Horizontal"
             android:layout_width="match_parent"
             android:layout_height="8dp"
-            android:progressTint="#4CAF50"
+            android:progressTint="@color/icon_green"
             android:progressBackgroundTint="#333333"
             android:max="100" />
 
@@ -252,7 +252,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:text="L Knee: --°\nR Knee: --°"
-                android:textColor="#4CAF50"
+                android:textColor="@color/icon_green"
                 android:textSize="12sp"
                 android:gravity="center" />
 
@@ -287,7 +287,7 @@
         android:layout_height="wrap_content"
         android:layout_margin="16dp"
         app:cardCornerRadius="16dp"
-        app:cardBackgroundColor="#252542"
+        app:cardBackgroundColor="@color/card_surface_dark"
         app:cardElevation="3dp"
         android:visibility="gone">
 
@@ -307,7 +307,7 @@
                 android:layout_width="22dp"
                 android:layout_height="22dp"
                 android:src="@drawable/ic_bar_chart_24"
-                app:tint="#9C27B0"
+                app:tint="@color/icon_purple"
                 android:layout_marginEnd="16dp" />
 
             <TextView
@@ -323,7 +323,7 @@
                 android:layout_width="18dp"
                 android:layout_height="18dp"
                 android:src="@drawable/ic_chevron_right"
-                app:tint="#9C27B0" />
+                app:tint="@color/icon_purple" />
 
         </LinearLayout>
     </androidx.cardview.widget.CardView>

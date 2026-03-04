@@ -84,7 +84,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="82°"
-                android:textColor="#4FC3F7"
+                android:textColor="@color/icon_light_blue"
                 android:textSize="14sp"
                 android:textStyle="bold" />
         </LinearLayout>
@@ -109,7 +109,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="84°"
-                android:textColor="#4FC3F7"
+                android:textColor="@color/icon_light_blue"
                 android:textSize="14sp"
                 android:textStyle="bold" />
         </LinearLayout>
@@ -184,7 +184,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="3°"
-                android:textColor="#4CAF50"
+                android:textColor="@color/icon_green"
                 android:textSize="14sp"
                 android:textStyle="bold" />
         </LinearLayout>
@@ -207,7 +207,7 @@
             android:layout_width="18dp"
             android:layout_height="18dp"
             android:src="@drawable/ic_bar_chart_24"
-            app:tint="#4FC3F7"
+            app:tint="@color/icon_light_blue"
             android:layout_marginEnd="12dp" />
 
         <TextView
@@ -223,7 +223,7 @@
             android:layout_width="14dp"
             android:layout_height="14dp"
             android:src="@drawable/ic_chevron_right"
-            app:tint="#4FC3F7" />
+            app:tint="@color/icon_light_blue" />
 
     </LinearLayout>
 

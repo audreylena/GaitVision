@@ -70,7 +70,7 @@ class VideoPickerActivity : BaseActivity() {
                     // Show the video view and hide placeholder
                     videoView.visibility = View.VISIBLE
                     tvPlaceholder.visibility = View.GONE
-                    btnContinue.parent.let { (it as View).visibility = View.VISIBLE }
+                    cardContinue.visibility = View.VISIBLE
 
                     // Update status text
                     tvStatus.text = "Video loaded successfully"

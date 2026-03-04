@@ -32,7 +32,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="48dp"
                     android:orientation="horizontal"
-                    android:background="#252542"
+                    android:background="@color/card_surface_dark"
                     android:gravity="center_vertical" />
 
                 <View

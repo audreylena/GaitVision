@@ -20,6 +20,9 @@ interface AnalysisResultDao {
     @Query("SELECT * FROM results WHERE patientId = :patientId ORDER BY recordedAt DESC")
     fun getResultsByPatientIdOrdered(patientId: Int): Flow<List<AnalysisResult>>
 
+    @Query("SELECT * FROM results WHERE patientId = :patientId ORDER BY recordedAt ASC")
+    fun getResultsByPatientIdOrderedAsc(patientId: Int): Flow<List<AnalysisResult>>
+
     // Delete
     @Query("DELETE FROM results WHERE id = :resultId")
     suspend fun deleteResultById(resultId: Long): Int

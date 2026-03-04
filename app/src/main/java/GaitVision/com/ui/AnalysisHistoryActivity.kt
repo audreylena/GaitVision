@@ -77,6 +77,7 @@ class AnalysisHistoryActivity : BaseActivity() {
 
     private var patientIdArg: Int = -1
     private lateinit var columns: List<ColumnDef>
+    private lateinit var tableAdapter: AnalysisTableAdapter
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -99,7 +100,11 @@ class AnalysisHistoryActivity : BaseActivity() {
         columns = buildColumns()
         buildHeaderRow()
 
+        // Create the adapter once — we'll call submitList() on each update
+        tableAdapter = AnalysisTableAdapter(columns) { result -> openResults(result) }
+
         rvTable.layoutManager = LinearLayoutManager(this)
+        rvTable.adapter = tableAdapter
         rvTable.addItemDecoration(
             DividerItemDecoration(this, DividerItemDecoration.VERTICAL)
         )
@@ -189,9 +194,7 @@ class AnalysisHistoryActivity : BaseActivity() {
                             rvTable.visibility    = View.VISIBLE
                             headerRow.visibility  = View.VISIBLE
                             emptyState.visibility = View.GONE
-                            rvTable.adapter = AnalysisTableAdapter(results, columns) { result ->
-                                openResults(result)
-                            }
+                            tableAdapter.submitList(results)
                         }
                     }
             }

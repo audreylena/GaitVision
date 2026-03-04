@@ -103,9 +103,9 @@ class ProgressOverTimeActivity : BaseActivity() {
     private fun observeData() {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                analysisResultDao.getResultsByPatientIdOrdered(patientIdArg)
+                analysisResultDao.getResultsByPatientIdOrderedAsc(patientIdArg)
                     .collect { results ->
-                        renderCharts(results.sortedBy { it.recordedAt })
+                        renderCharts(results)
                     }
             }
         }

@@ -3,10 +3,11 @@ package GaitVision.com.ui
 import android.graphics.Color
 import androidx.core.content.ContextCompat
 import android.view.Gravity
-import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import GaitVision.com.R
 import GaitVision.com.data.AnalysisResult
@@ -14,16 +15,28 @@ import GaitVision.com.data.AnalysisResult
 /**
  * RecyclerView adapter for the analysis history data table.
  *
+ * Uses [ListAdapter] + [DiffUtil] so the adapter is created once and updated
+ * via [submitList] — avoids full adapter replacement on every Flow emission,
+ * preventing flickering and scroll-position loss.
+ *
  * Rows are built **programmatically** to match whatever [columns] was built
  * via reflection in [AnalysisHistoryActivity].  Adding new fields to
  * [AnalysisResult] automatically adds columns — this adapter never needs to
  * be modified for that.
  */
 class AnalysisTableAdapter(
-    private val items: List<AnalysisResult>,
     private val columns: List<AnalysisHistoryActivity.ColumnDef>,
     private val onRowClick: (AnalysisResult) -> Unit
-) : RecyclerView.Adapter<AnalysisTableAdapter.RowViewHolder>() {
+) : ListAdapter<AnalysisResult, AnalysisTableAdapter.RowViewHolder>(DIFF_CALLBACK) {
+
+    companion object {
+        private val DIFF_CALLBACK = object : DiffUtil.ItemCallback<AnalysisResult>() {
+            override fun areItemsTheSame(old: AnalysisResult, new: AnalysisResult) =
+                old.id == new.id
+            override fun areContentsTheSame(old: AnalysisResult, new: AnalysisResult) =
+                old == new
+        }
+    }
 
     inner class RowViewHolder(val row: LinearLayout) : RecyclerView.ViewHolder(row)
 
@@ -38,11 +51,10 @@ class AnalysisTableAdapter(
             setPadding(0, (10 * density).toInt(), 0, (10 * density).toInt())
             isClickable = true
             isFocusable = true
-            // Use the theme's ripple instead of the deprecated list_selector_background
-            with(android.util.TypedValue()) {
-                context.theme.resolveAttribute(android.R.attr.selectableItemBackground, this, true)
-                setBackgroundResource(resourceId)
-            }
+            // Ripple goes on the FOREGROUND so setBackgroundColor() in onBind doesn't erase it
+            val outValue = android.util.TypedValue()
+            context.theme.resolveAttribute(android.R.attr.selectableItemBackground, outValue, true)
+            foreground = ContextCompat.getDrawable(context, outValue.resourceId)
         }
 
         // Create one TextView per column (plus "View Results" action cell)
@@ -80,10 +92,10 @@ class AnalysisTableAdapter(
     }
 
     override fun onBindViewHolder(holder: RowViewHolder, position: Int) {
-        val result = items[position]
+        val result = getItem(position)
         val density = holder.row.context.resources.displayMetrics.density
 
-        // Alternate row backgrounds for readability
+        // Alternate row backgrounds for readability (ripple is on foreground, so this is safe)
         holder.row.setBackgroundColor(
             if (position % 2 == 0)
                 ContextCompat.getColor(holder.row.context, R.color.table_row_even)
@@ -116,6 +128,5 @@ class AnalysisTableAdapter(
         // Row click
         holder.row.setOnClickListener { onRowClick(result) }
     }
-
-    override fun getItemCount() = items.size
 }
+

@@ -7,7 +7,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
-import android.widget.Button
+import android.widget.LinearLayout
 import android.widget.EditText
 import android.widget.Spinner
 import android.widget.TextView
@@ -34,8 +34,8 @@ class PatientCreateActivity : BaseActivity() {
     private lateinit var etFeet: EditText
     private lateinit var etInches: EditText
     private lateinit var etNotes: EditText
-    private lateinit var btnCreatePatient: Button
-    private lateinit var btnCreateAndAnalyze: Button
+    private lateinit var btnCreatePatient: LinearLayout
+    private lateinit var btnCreateAndAnalyze: LinearLayout
 
     private var editingPatientId: Int = -1
 
@@ -84,8 +84,9 @@ class PatientCreateActivity : BaseActivity() {
         }
 
         if (editingPatientId > 0) {
-            btnCreatePatient.text = "Save Changes"
-            btnCreateAndAnalyze.text = "Save & Start Analysis →"
+            // Update the child TextViews inside the LinearLayout rows
+            (btnCreatePatient.getChildAt(1) as? TextView)?.text = "Save Changes"
+            (btnCreateAndAnalyze.getChildAt(1) as? TextView)?.text = "Save & Start Analysis"
         } else {
             // Load next patient ID for new patient
             loadNextPatientId()

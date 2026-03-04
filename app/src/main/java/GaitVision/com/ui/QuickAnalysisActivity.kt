@@ -2,7 +2,7 @@ package GaitVision.com.ui
 
 import android.content.Intent
 import android.os.Bundle
-import android.widget.Button
+import android.widget.LinearLayout
 import android.widget.EditText
 import GaitVision.com.R
 import GaitVision.com.AnalysisSession
@@ -36,7 +36,7 @@ class QuickAnalysisActivity : BaseActivity() {
     }
 
     private fun setupButtons() {
-        findViewById<Button>(R.id.btnRecord).setOnClickListener {
+        findViewById<LinearLayout>(R.id.btnRecord).setOnClickListener {
             if (validateAndSaveInputs()) {
                 val intent = Intent(this, VideoPickerActivity::class.java)
                 intent.putExtra("mode", "record")
@@ -45,7 +45,7 @@ class QuickAnalysisActivity : BaseActivity() {
             }
         }
 
-        findViewById<Button>(R.id.btnSelect).setOnClickListener {
+        findViewById<LinearLayout>(R.id.btnSelect).setOnClickListener {
             if (validateAndSaveInputs()) {
                 val intent = Intent(this, VideoPickerActivity::class.java)
                 intent.putExtra("mode", "gallery")
@@ -54,7 +54,7 @@ class QuickAnalysisActivity : BaseActivity() {
             }
         }
 
-        findViewById<Button>(R.id.btnViewResults).setOnClickListener {
+        findViewById<LinearLayout>(R.id.btnViewResults).setOnClickListener {
             startActivity(Intent(this, ResultsActivity::class.java))
         }
     }

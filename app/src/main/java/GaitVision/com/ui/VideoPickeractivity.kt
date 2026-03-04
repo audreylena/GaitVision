@@ -5,7 +5,7 @@ import android.os.Bundle
 import android.provider.MediaStore
 import android.util.Log
 import android.view.View
-import android.widget.Button
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.VideoView
 import android.widget.Toast
@@ -28,7 +28,8 @@ class VideoPickerActivity : BaseActivity() {
     private lateinit var videoView: VideoView
     private lateinit var tvPlaceholder: TextView
     private lateinit var tvStatus: TextView
-    private lateinit var btnContinue: Button
+    private lateinit var btnContinue: LinearLayout
+    private lateinit var cardContinue: View
     private lateinit var tvDate: TextView
     private lateinit var btnEditDate: ImageButton
 
@@ -47,6 +48,8 @@ class VideoPickerActivity : BaseActivity() {
         tvPlaceholder = findViewById(R.id.tvPlaceholder)
         tvStatus = findViewById(R.id.tvStatus)
         btnContinue = findViewById(R.id.btnContinue)
+        // The parent CardView controls visibility (the LinearLayout is inside it)
+        cardContinue = (btnContinue.parent as View)
         tvDate = findViewById(R.id.tvDate)
         btnEditDate = findViewById(R.id.btnEditDate)
 
@@ -67,7 +70,7 @@ class VideoPickerActivity : BaseActivity() {
                     // Show the video view and hide placeholder
                     videoView.visibility = View.VISIBLE
                     tvPlaceholder.visibility = View.GONE
-                    btnContinue.visibility = View.VISIBLE
+                    btnContinue.parent.let { (it as View).visibility = View.VISIBLE }
 
                     // Update status text
                     tvStatus.text = "Video loaded successfully"
@@ -88,7 +91,7 @@ class VideoPickerActivity : BaseActivity() {
                 }
             }
 
-        findViewById<Button>(R.id.btnPick).setOnClickListener {
+        findViewById<LinearLayout>(R.id.btnPick).setOnClickListener {
             // Use PickVisualMedia to select only videos
             val request = PickVisualMediaRequest.Builder()
                 .setMediaType(ActivityResultContracts.PickVisualMedia.VideoOnly)
@@ -96,7 +99,7 @@ class VideoPickerActivity : BaseActivity() {
             pickVideoLauncher.launch(request)
         }
 
-        findViewById<Button>(R.id.btnRecord).setOnClickListener {
+        findViewById<LinearLayout>(R.id.btnRecord).setOnClickListener {
             val recordIntent = Intent(MediaStore.ACTION_VIDEO_CAPTURE)
             startActivity(recordIntent)
         }

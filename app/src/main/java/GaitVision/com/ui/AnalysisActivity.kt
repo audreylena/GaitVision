@@ -7,7 +7,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.view.View
-import android.widget.Button
+import android.widget.LinearLayout
 import android.widget.MediaController
 import android.widget.TextView
 import android.widget.Toast
@@ -89,7 +89,7 @@ class AnalysisActivity : BaseActivity() {
         // Check if we have a video to process
         if (AnalysisSession.galleryUri == null) {
             Toast.makeText(this, "No video selected. Please go back.", Toast.LENGTH_SHORT).show()
-            findViewById<Button>(R.id.btnRunAnalysis).isEnabled = false
+            // Card stays visible but click listener guards against null URI
         }
 
         // If already processed, show the video
@@ -103,7 +103,7 @@ class AnalysisActivity : BaseActivity() {
         findViewById<View>(R.id.progressSection).visibility = View.GONE
         findViewById<View>(R.id.videoSection).visibility = View.GONE
         findViewById<View>(R.id.anglesSection).visibility = View.GONE
-        findViewById<Button>(R.id.btnViewResults).visibility = View.GONE
+        findViewById<View>(R.id.cardViewResults).visibility = View.GONE
 
         // Show info section
         findViewById<View>(R.id.infoSection).visibility = View.VISIBLE
@@ -120,13 +120,13 @@ class AnalysisActivity : BaseActivity() {
     }
 
     private fun setupButtons() {
-        findViewById<Button>(R.id.btnRunAnalysis).setOnClickListener {
+        findViewById<LinearLayout>(R.id.btnRunAnalysis).setOnClickListener {
             if (!isProcessing && AnalysisSession.galleryUri != null) {
                 runAnalysis()
             }
         }
 
-        findViewById<Button>(R.id.btnViewResults).setOnClickListener {
+        findViewById<LinearLayout>(R.id.btnViewResults).setOnClickListener {
             updateRunnable?.let { handler.removeCallbacks(it) }
             startActivity(Intent(this, ResultsActivity::class.java))
         }
@@ -134,8 +134,8 @@ class AnalysisActivity : BaseActivity() {
 
     private fun runAnalysis() {
         isProcessing = true
-        findViewById<Button>(R.id.btnRunAnalysis).isEnabled = false
-        findViewById<Button>(R.id.btnRunAnalysis).text = "Processing..."
+        // Hide the run-analysis card; progress section takes over
+        findViewById<View>(R.id.cardRunAnalysis).visibility = View.GONE
 
         // Show progress section
         findViewById<View>(R.id.infoSection).visibility = View.GONE
@@ -192,9 +192,8 @@ class AnalysisActivity : BaseActivity() {
                     ).show()
                     findViewById<View>(R.id.progressSection).visibility = View.GONE
                     findViewById<View>(R.id.infoSection).visibility = View.VISIBLE
-                    val runButton = findViewById<Button>(R.id.btnRunAnalysis)
-                    runButton.isEnabled = true
-                    runButton.text = "Run Analysis"
+                    // Restore run button card on error
+                    findViewById<View>(R.id.cardRunAnalysis).visibility = View.VISIBLE
                     isProcessing = false
                 }
             }
@@ -336,9 +335,9 @@ class AnalysisActivity : BaseActivity() {
         findViewById<View>(R.id.videoSection).visibility = View.VISIBLE
         findViewById<View>(R.id.anglesSection).visibility = View.VISIBLE
         
-        findViewById<Button>(R.id.btnViewResults).visibility = View.VISIBLE
-        
-        findViewById<Button>(R.id.btnRunAnalysis).visibility = View.GONE
+        findViewById<View>(R.id.cardViewResults).visibility = View.VISIBLE
+        // Keep run analysis card hidden (processing is done)
+        findViewById<View>(R.id.cardRunAnalysis).visibility = View.GONE
 
         AnalysisSession.editedUri?.let { uri ->
             videoView.setVideoURI(uri)

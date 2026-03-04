@@ -102,16 +102,46 @@
 
     </androidx.cardview.widget.CardView>
 
-    <!-- Signal Selector -->
-    <Button
-        android:id="@+id/btnSelectSignal"
+    <!-- Signal Selector (action — no chevron) -->
+    <androidx.cardview.widget.CardView
         android:layout_width="match_parent"
-        android:layout_height="48dp"
+        android:layout_height="wrap_content"
         android:layout_marginHorizontal="16dp"
         android:layout_marginBottom="8dp"
-        android:text="Inter-Ankle Distance"
-        android:textColor="@color/white"
-        android:backgroundTint="#424242" />
+        app:cardCornerRadius="12dp"
+        app:cardBackgroundColor="#252542"
+        app:cardElevation="2dp">
+
+        <LinearLayout
+            android:id="@+id/btnSelectSignal"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:background="?attr/selectableItemBackground"
+            android:focusable="true"
+            android:clickable="true">
+
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ic_bar_chart_24"
+                app:tint="#9C27B0"
+                android:layout_marginEnd="12dp" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Inter-Ankle Distance"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+        </LinearLayout>
+    </androidx.cardview.widget.CardView>
 
     <!-- Chart Area -->
     <androidx.cardview.widget.CardView

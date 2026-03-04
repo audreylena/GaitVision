@@ -63,6 +63,20 @@
     <color name="status_warning">#FFF59E0B</color>
     <color name="status_error">#FFF43F5E</color>
     <color name="status_info">#FF3B82F6</color>
+
+    <!-- Score / Gait Rating Colors -->
+    <color name="score_good">#FF4CAF50</color>
+    <color name="score_warn">#FFFF9800</color>
+    <color name="score_poor">#FFFF5252</color>
+    <color name="score_none">#FF888888</color>
+
+    <!-- Table / Chart UI Colors -->
+    <color name="table_header_text">#FF4FC3F7</color>
+    <color name="table_row_even">#FF1E1E38</color>
+    <color name="table_row_odd">#FF252542</color>
+    <color name="chart_grid">#22FFFFFF</color>
+    <color name="chart_axis_text">#FFAAAAAA</color>
+    <color name="chart_no_data_text">#FF666666</color>
     
     <!-- Legacy Colors (for compatibility) -->
     <color name="logo_blue">#FF3B82F6</color>

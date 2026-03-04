@@ -29,6 +29,18 @@
     <string name="record_video">Record Video</string>
     <string name="select_video">Select Video</string>
     <string name="video_preview_placeholder">Video preview will appear here</string>
+
+    <!-- Date Picker -->
+    <string name="label_recording_date">Recording Date</string>
+    <string name="label_date_today">Today</string>
+
+    <!-- Patient Profile Demographics Labels -->
+    <string name="label_age">AGE</string>
+    <string name="label_gender">GENDER</string>
+    <string name="label_height">HEIGHT</string>
+    <string name="label_added">ADDED</string>
+    <string name="label_analyses">ANALYSES</string>
+    <string name="label_latest_score">LATEST SCORE</string>
     
     <!-- Analysis -->
     <string name="perform_analysis">Perform Analysis</string>

@@ -2,27 +2,27 @@ package GaitVision.com.ui
 
 import android.app.AlertDialog
 import android.content.Intent
+import android.graphics.Color
 import android.os.Bundle
-import android.view.LayoutInflater
-import android.view.View
-import android.view.ViewGroup
-import android.widget.AdapterView
-import android.widget.ArrayAdapter
-import android.widget.Button
-import android.widget.EditText
-import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
-import androidx.recyclerview.widget.DiffUtil
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
+import androidx.lifecycle.repeatOnLifecycle
+import androidx.core.content.ContextCompat
 import GaitVision.com.R
 import GaitVision.com.data.*
 import GaitVision.com.AnalysisSession
+import com.github.mikephil.charting.charts.LineChart
+import com.github.mikephil.charting.components.LimitLine
+import com.github.mikephil.charting.components.XAxis
+import com.github.mikephil.charting.data.Entry
+import com.github.mikephil.charting.data.LineData
+import com.github.mikephil.charting.data.LineDataSet
+import com.github.mikephil.charting.formatter.ValueFormatter
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
@@ -32,19 +32,21 @@ class PatientProfileActivity : BaseActivity() {
 
     private lateinit var patientDao: PatientDao
     private lateinit var analysisResultDao: AnalysisResultDao
-    
+
+    // Hero card
     private lateinit var tvPatientId: TextView
     private lateinit var tvPatientName: TextView
+    // Demographics
     private lateinit var tvAge: TextView
     private lateinit var tvGender: TextView
     private lateinit var tvHeight: TextView
     private lateinit var tvCreatedAt: TextView
+    // Stats
     private lateinit var tvTotalAnalyses: TextView
-    private lateinit var tvAvgScore: TextView
-    private lateinit var rvAnalyses: RecyclerView
-    private lateinit var emptyAnalysisState: View
-    
-    private lateinit var adapter: AnalysisAdapter
+    private lateinit var tvLastScore: TextView
+    // Chart
+    private lateinit var progressChart: LineChart
+
     private var patientIdArg: Int = -1
     private var currentPatient: Patient? = null
 
@@ -65,109 +67,214 @@ class PatientProfileActivity : BaseActivity() {
 
         setupCommonHeader("Patient Profile")
         initViews()
-        setupRecyclerView()
-        // Data is loaded in onResume (which fires after onCreate), no need to double-load here
+        startObservingData()
     }
 
     private fun initViews() {
-        tvPatientId = findViewById(R.id.tvPatientId)
-        tvPatientName = findViewById(R.id.tvPatientName)
-        tvAge = findViewById(R.id.tvAge)
-        tvGender = findViewById(R.id.tvGender)
-        tvHeight = findViewById(R.id.tvHeight)
-        tvCreatedAt = findViewById(R.id.tvCreatedAt)
-        tvTotalAnalyses = findViewById(R.id.tvTotalAnalyses)
-        tvAvgScore = findViewById(R.id.tvAvgScore)
-        rvAnalyses = findViewById(R.id.rvAnalyses)
-        emptyAnalysisState = findViewById(R.id.emptyAnalysisState)
+        // Hero card
+        tvPatientId       = findViewById(R.id.tvPatientId)
+        tvPatientName     = findViewById(R.id.tvPatientName)
+        // Demographics
+        tvAge             = findViewById(R.id.tvAge)
+        tvGender          = findViewById(R.id.tvGender)
+        tvHeight          = findViewById(R.id.tvHeight)
+        tvCreatedAt       = findViewById(R.id.tvCreatedAt)
+        // Stats strip
+        tvTotalAnalyses   = findViewById(R.id.tvTotalAnalyses)
+        tvLastScore       = findViewById(R.id.tvLastScore)
+        // Chart
+        progressChart     = findViewById(R.id.progressChart)
 
-        findViewById<ImageButton>(R.id.btnEdit).setOnClickListener {
+        setupChart()
+
+        // Hero: edit / delete now live in the action list
+        findViewById<LinearLayout>(R.id.btnEdit).setOnClickListener {
             val intent = Intent(this, PatientCreateActivity::class.java)
             intent.putExtra("patientId", patientIdArg.toLong())
             startActivity(intent)
         }
-
-        findViewById<ImageButton>(R.id.btnDelete).setOnClickListener {
+        findViewById<LinearLayout>(R.id.btnDelete).setOnClickListener {
             showDeleteConfirmation()
         }
 
-        findViewById<Button>(R.id.btnNewAnalysis).setOnClickListener {
+        // Action cards
+        findViewById<LinearLayout>(R.id.btnNewAnalysis).setOnClickListener {
             startNewAnalysis()
         }
+        findViewById<LinearLayout>(R.id.btnViewHistory).setOnClickListener {
+            openAnalysisHistory()
+        }
+        findViewById<LinearLayout>(R.id.btnViewProgressCard).setOnClickListener {
+            openProgressView()
+        }
+
+
     }
 
-    private fun setupRecyclerView() {
-        adapter = AnalysisAdapter(
-            onViewResults = { result ->
-                val intent = Intent(this, ResultsActivity::class.java)
-                intent.putExtra(ResultsActivity.EXTRA_RESULT_ID, result.id)
-                startActivity(intent)
-            }
-        )
-        rvAnalyses.layoutManager = LinearLayoutManager(this)
-        rvAnalyses.adapter = adapter
-        rvAnalyses.isNestedScrollingEnabled = false
-    }
-
-    private fun loadPatientData() {
+    /**
+     * Starts the Flow collection exactly once. repeatOnLifecycle(STARTED) will
+     * auto-pause when the activity is stopped and resume when it comes back.
+     */
+    private fun startObservingData() {
         lifecycleScope.launch {
-            // Load patient
             val patient = withContext(Dispatchers.IO) {
                 patientDao.getPatientById(patientIdArg)
             }
-
             if (patient == null) {
                 Toast.makeText(this@PatientProfileActivity, "Patient not found", Toast.LENGTH_SHORT).show()
                 finish()
                 return@launch
             }
-
             currentPatient = patient
             displayPatientInfo(patient)
 
-            // Load analysis results
-            analysisResultDao.getResultsByPatientIdOrdered(patientIdArg).collectLatest { results ->
-                updateAnalysisList(results)
-                updateStats(results)
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                analysisResultDao.getResultsByPatientIdOrdered(patientIdArg).collect { results ->
+                    updateStats(results)
+                }
             }
         }
     }
 
     private fun displayPatientInfo(patient: Patient) {
-        tvPatientId.text = patient.participantId?.toString() ?: "N/A"
+        // Plain numeric ID – no letter prefix
+        tvPatientId.text = patient.participantId?.toString() ?: "—"
+
         tvPatientName.text = patient.fullName
-        tvAge.text = if (patient.age != null) "${patient.age} years" else "—"
-        tvGender.text = patient.gender ?: "—"
-        
-        val feet = patient.height / 12
+        tvAge.text         = if (patient.age != null) "${patient.age} yr" else "—"
+        tvGender.text      = patient.gender ?: "—"
+
+        val feet   = patient.height / 12
         val inches = patient.height % 12
         tvHeight.text = "$feet'$inches\""
-        
-        val dateFormat = SimpleDateFormat("MMM d, yyyy", Locale.getDefault())
-        tvCreatedAt.text = "Added: ${dateFormat.format(Date(patient.createdAt))}"
-    }
 
-    private fun updateAnalysisList(analyses: List<AnalysisResult>) {
-        if (analyses.isEmpty()) {
-            rvAnalyses.visibility = View.GONE
-            emptyAnalysisState.visibility = View.VISIBLE
-        } else {
-            rvAnalyses.visibility = View.VISIBLE
-            emptyAnalysisState.visibility = View.GONE
-            adapter.submitList(analyses)
-        }
+        val dateFormat = SimpleDateFormat("MMM d, yyyy", Locale.getDefault())
+        tvCreatedAt.text = dateFormat.format(Date(patient.createdAt))
     }
 
     private fun updateStats(analyses: List<AnalysisResult>) {
         tvTotalAnalyses.text = analyses.size.toString()
-        
-        val scores = analyses.mapNotNull { it.overallScore }
-        if (scores.isNotEmpty()) {
-            val avgScore = scores.average().toInt()
-            tvAvgScore.text = avgScore.toString()
+
+        // Latest overall score
+        val latestScore = analyses
+            .filter { it.overallScore != null }
+            .maxByOrNull { it.recordedAt }
+            ?.overallScore
+
+        if (latestScore != null) {
+            tvLastScore.text = latestScore.toInt().toString()
+            tvLastScore.setTextColor(scoreColor(latestScore))
         } else {
-            tvAvgScore.text = "—"
+            tvLastScore.text = "—"
+            tvLastScore.setTextColor(ContextCompat.getColor(this, R.color.score_none))
         }
+
+        updateProgressChart(analyses)
+    }
+
+    private fun scoreColor(score: Double): Int = when {
+        score >= 80 -> ContextCompat.getColor(this, R.color.score_good)
+        score >= 60 -> ContextCompat.getColor(this, R.color.score_warn)
+        else        -> ContextCompat.getColor(this, R.color.score_poor)
+    }
+
+    private fun setupChart() {
+        progressChart.apply {
+            description.isEnabled = false
+            setTouchEnabled(true)
+            isDragEnabled = true
+            setScaleEnabled(true)
+            setPinchZoom(true)
+            setDrawGridBackground(false)
+
+            xAxis.apply {
+                position = XAxis.XAxisPosition.BOTTOM
+                textColor = ContextCompat.getColor(this@PatientProfileActivity, R.color.text_white)
+                setDrawGridLines(false)
+                granularity = 1f
+                valueFormatter = object : ValueFormatter() {
+                    private val fmt = SimpleDateFormat("MM/dd", Locale.getDefault())
+                    override fun getFormattedValue(value: Float): String =
+                        fmt.format(Date(value.toLong()))
+                }
+            }
+
+            axisLeft.apply {
+                textColor = ContextCompat.getColor(this@PatientProfileActivity, R.color.text_white)
+                axisMinimum = 0f
+                axisMaximum = 100f
+                setDrawGridLines(true)
+                gridColor = ContextCompat.getColor(this@PatientProfileActivity, R.color.chart_grid)
+                removeAllLimitLines()
+                addLimitLine(LimitLine(80f, "Good").apply {
+                    lineWidth = 1.5f
+                    lineColor = ContextCompat.getColor(this@PatientProfileActivity, R.color.score_good)
+                    enableDashedLine(10f, 6f, 0f)
+                    textColor = ContextCompat.getColor(this@PatientProfileActivity, R.color.score_good)
+                    textSize = 9f
+                    labelPosition = LimitLine.LimitLabelPosition.RIGHT_TOP
+                })
+                addLimitLine(LimitLine(60f, "Fair").apply {
+                    lineWidth = 1.5f
+                    lineColor = ContextCompat.getColor(this@PatientProfileActivity, R.color.score_warn)
+                    enableDashedLine(10f, 6f, 0f)
+                    textColor = ContextCompat.getColor(this@PatientProfileActivity, R.color.score_warn)
+                    textSize = 9f
+                    labelPosition = LimitLine.LimitLabelPosition.RIGHT_TOP
+                })
+                setDrawLimitLinesBehindData(true)
+            }
+            axisRight.isEnabled = false
+            legend.isEnabled = false
+        }
+    }
+
+    private fun updateProgressChart(analyses: List<AnalysisResult>) {
+        val valid = analyses.filter { it.overallScore != null }.sortedBy { it.recordedAt }
+
+        if (valid.size < 2) {
+            progressChart.clear()
+            progressChart.setNoDataText("Complete at least 2 analyses to see progress")
+            progressChart.setNoDataTextColor(Color.GRAY)
+            return
+        }
+
+        val entries = valid.map { Entry(it.recordedAt.toFloat(), it.overallScore!!.toFloat()) }
+        val zoneColor = scoreColor(valid.last().overallScore ?: 0.0)
+
+        val dataSet = LineDataSet(entries, "Overall Score").apply {
+            color = zoneColor
+            setCircleColor(zoneColor)
+            lineWidth = 3f
+            circleRadius = 5f
+            setDrawCircleHole(true)
+            circleHoleColor = ContextCompat.getColor(this@PatientProfileActivity, R.color.table_row_odd)
+            valueTextColor = ContextCompat.getColor(this@PatientProfileActivity, R.color.text_white)
+            valueTextSize = 10f
+            setDrawFilled(false)
+            valueFormatter = object : ValueFormatter() {
+                override fun getFormattedValue(value: Float): String = value.toInt().toString()
+            }
+        }
+
+        progressChart.data = LineData(dataSet)
+        progressChart.invalidate()
+    }
+
+    private fun openAnalysisHistory() {
+        val patient = currentPatient ?: return
+        val intent = Intent(this, AnalysisHistoryActivity::class.java)
+        intent.putExtra(AnalysisHistoryActivity.EXTRA_PATIENT_ID, patientIdArg)
+        intent.putExtra(AnalysisHistoryActivity.EXTRA_PATIENT_NAME, patient.fullName)
+        startActivity(intent)
+    }
+
+    private fun openProgressView() {
+        val patient = currentPatient ?: return
+        val intent = Intent(this, ProgressOverTimeActivity::class.java)
+        intent.putExtra(ProgressOverTimeActivity.EXTRA_PATIENT_ID, patientIdArg)
+        intent.putExtra(ProgressOverTimeActivity.EXTRA_PATIENT_NAME, patient.fullName)
+        startActivity(intent)
     }
 
     private fun startNewAnalysis() {
@@ -187,18 +294,14 @@ class PatientProfileActivity : BaseActivity() {
         AlertDialog.Builder(this)
             .setTitle("Delete Patient")
             .setMessage("Are you sure you want to delete this patient and all their analysis data? This cannot be undone.")
-            .setPositiveButton("Delete") { _, _ ->
-                deletePatient()
-            }
+            .setPositiveButton("Delete") { _, _ -> deletePatient() }
             .setNegativeButton("Cancel", null)
             .show()
     }
 
     private fun deletePatient() {
         lifecycleScope.launch {
-            withContext(Dispatchers.IO) {
-                patientDao.deletePatientById(patientIdArg)
-            }
+            withContext(Dispatchers.IO) { patientDao.deletePatientById(patientIdArg) }
             Toast.makeText(this@PatientProfileActivity, "Patient deleted", Toast.LENGTH_SHORT).show()
             finish()
         }
@@ -206,84 +309,6 @@ class PatientProfileActivity : BaseActivity() {
 
     override fun onResume() {
         super.onResume()
-        loadPatientData()
+        // Data observation is handled in startObservingData() via repeatOnLifecycle
     }
 }
-
-// Analysis Adapter
-class AnalysisAdapter(
-    private val onViewResults: (AnalysisResult) -> Unit
-) : RecyclerView.Adapter<AnalysisAdapter.AnalysisViewHolder>() {
-
-    private var analyses: List<AnalysisResult> = emptyList()
-    private val dateFormat = SimpleDateFormat("MMM d, yyyy • h:mm a", Locale.getDefault())
-
-    fun submitList(newAnalyses: List<AnalysisResult>) {
-        val oldList = analyses
-        analyses = newAnalyses
-        DiffUtil.calculateDiff(object : DiffUtil.Callback() {
-            override fun getOldListSize() = oldList.size
-            override fun getNewListSize() = newAnalyses.size
-            override fun areItemsTheSame(oldPos: Int, newPos: Int) =
-                oldList[oldPos].id == newAnalyses[newPos].id
-            override fun areContentsTheSame(oldPos: Int, newPos: Int) =
-                oldList[oldPos] == newAnalyses[newPos]
-        }).dispatchUpdatesTo(this)
-    }
-
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): AnalysisViewHolder {
-        val view = LayoutInflater.from(parent.context)
-            .inflate(R.layout.item_analysis_card, parent, false)
-        return AnalysisViewHolder(view)
-    }
-
-    override fun onBindViewHolder(holder: AnalysisViewHolder, position: Int) {
-        holder.bind(analyses[position])
-    }
-
-    override fun getItemCount() = analyses.size
-
-    inner class AnalysisViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        private val tvDate: TextView = itemView.findViewById(R.id.tvDate)
-        private val tvScore: TextView = itemView.findViewById(R.id.tvScore)
-        private val scoreContainer: View = itemView.findViewById(R.id.scoreContainer)
-        private val tvLeftKnee: TextView = itemView.findViewById(R.id.tvLeftKnee)
-        private val tvRightKnee: TextView = itemView.findViewById(R.id.tvRightKnee)
-        private val tvLeftHip: TextView = itemView.findViewById(R.id.tvLeftHip)
-        private val tvRightHip: TextView = itemView.findViewById(R.id.tvRightHip)
-        private val tvTorso: TextView = itemView.findViewById(R.id.tvTorso)
-        private val btnViewResults: Button = itemView.findViewById(R.id.btnViewCharts)
-
-        fun bind(result: AnalysisResult) {
-            tvDate.text = dateFormat.format(Date(result.recordedAt))
-
-            val score = result.overallScore
-            if (score != null) {
-                tvScore.text = score.toInt().toString()
-                scoreContainer.setBackgroundResource(
-                    when {
-                        score >= 80 -> R.drawable.score_badge_background
-                        score >= 60 -> R.drawable.badge_background
-                        else -> R.drawable.button_outline_background
-                    }
-                )
-                
-                tvLeftKnee.text = result.kneeLeftRom?.let { "${it.toInt()}°" } ?: "—"
-                tvRightKnee.text = result.kneeRightRom?.let { "${it.toInt()}°" } ?: "—"
-                tvLeftHip.text = result.ldjHip?.let { String.format("%.2f", it) } ?: "—"
-                tvRightHip.text = "—"
-                tvTorso.text = result.trunkLeanStdDeg?.let { "${it.toInt()}°" } ?: "—"
-            } else {
-                tvScore.text = "—"
-                tvLeftKnee.text = "—"
-                tvRightKnee.text = "—"
-                tvLeftHip.text = "—"
-                tvRightHip.text = "—"
-                tvTorso.text = "—"
-            }
-
-            btnViewResults.setOnClickListener { onViewResults(result) }
-        }
-    }
-}
-

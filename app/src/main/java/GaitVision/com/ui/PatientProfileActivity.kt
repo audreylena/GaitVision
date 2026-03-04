@@ -5,20 +5,16 @@ import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
-import android.view.ViewGroup
-import android.widget.AdapterView
-import android.widget.ArrayAdapter
 import android.widget.Button
-import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
-import androidx.recyclerview.widget.DiffUtil
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
+import androidx.lifecycle.repeatOnLifecycle
 import GaitVision.com.R
+import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
 import GaitVision.com.data.*
 import GaitVision.com.AnalysisSession
 import com.github.mikephil.charting.charts.LineChart
@@ -29,7 +25,7 @@ import com.github.mikephil.charting.data.LineDataSet
 import com.github.mikephil.charting.formatter.ValueFormatter
 import android.graphics.Color
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
@@ -48,13 +44,15 @@ class PatientProfileActivity : BaseActivity() {
     private lateinit var tvCreatedAt: TextView
     private lateinit var tvTotalAnalyses: TextView
     private lateinit var tvAvgScore: TextView
-    private lateinit var rvAnalyses: RecyclerView
+    private lateinit var analysisListContainer: LinearLayout
     private lateinit var emptyAnalysisState: View
     private lateinit var progressChart: LineChart
-    
-    private lateinit var adapter: AnalysisAdapter
+    private val dateFormat = SimpleDateFormat("MMM d, yyyy \u2022 h:mm a", Locale.getDefault())
     private var patientIdArg: Int = -1
     private var currentPatient: Patient? = null
+
+    private var allAnalyses: List<AnalysisResult> = emptyList()
+    private var isShowingAllAnalyses = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -73,8 +71,7 @@ class PatientProfileActivity : BaseActivity() {
 
         setupCommonHeader("Patient Profile")
         initViews()
-        setupRecyclerView()
-        // Data is loaded in onResume (which fires after onCreate), no need to double-load here
+        startObservingData()
     }
 
     private fun initViews() {
@@ -86,7 +83,7 @@ class PatientProfileActivity : BaseActivity() {
         tvCreatedAt = findViewById(R.id.tvCreatedAt)
         tvTotalAnalyses = findViewById(R.id.tvTotalAnalyses)
         tvAvgScore = findViewById(R.id.tvAvgScore)
-        rvAnalyses = findViewById(R.id.rvAnalyses)
+        analysisListContainer = findViewById(R.id.analysisListContainer)
         emptyAnalysisState = findViewById(R.id.emptyAnalysisState)
         progressChart = findViewById(R.id.progressChart)
 
@@ -102,44 +99,42 @@ class PatientProfileActivity : BaseActivity() {
             showDeleteConfirmation()
         }
 
-        findViewById<Button>(R.id.btnNewAnalysis).setOnClickListener {
+        findViewById<ExtendedFloatingActionButton>(R.id.btnNewAnalysis).setOnClickListener {
             startNewAnalysis()
+        }
+
+        val tvViewAll = findViewById<TextView>(R.id.tvViewAll)
+        tvViewAll.setOnClickListener {
+            isShowingAllAnalyses = !isShowingAllAnalyses
+            updateAnalysisListUI()
         }
     }
 
-    private fun setupRecyclerView() {
-        adapter = AnalysisAdapter(
-            onViewResults = { result ->
-                val intent = Intent(this, ResultsActivity::class.java)
-                intent.putExtra(ResultsActivity.EXTRA_RESULT_ID, result.id)
-                startActivity(intent)
-            }
-        )
-        rvAnalyses.layoutManager = LinearLayoutManager(this)
-        rvAnalyses.adapter = adapter
-        rvAnalyses.isNestedScrollingEnabled = false
-    }
-
-    private fun loadPatientData() {
+    /**
+     * Starts the Flow collection exactly once. repeatOnLifecycle(STARTED) will
+     * auto-pause when the activity is stopped and resume when it comes back,
+     * but we never restart the collector — so isShowingAllAnalyses is preserved.
+     */
+    private fun startObservingData() {
         lifecycleScope.launch {
-            // Load patient
+            // Load patient info once
             val patient = withContext(Dispatchers.IO) {
                 patientDao.getPatientById(patientIdArg)
             }
-
             if (patient == null) {
                 Toast.makeText(this@PatientProfileActivity, "Patient not found", Toast.LENGTH_SHORT).show()
                 finish()
                 return@launch
             }
-
             currentPatient = patient
             displayPatientInfo(patient)
 
-            // Load analysis results
-            analysisResultDao.getResultsByPatientIdOrdered(patientIdArg).collectLatest { results ->
-                updateAnalysisList(results)
-                updateStats(results)
+            // Observe results — this is the single, permanent collector
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                analysisResultDao.getResultsByPatientIdOrdered(patientIdArg).collect { results ->
+                    updateAnalysisList(results)
+                    updateStats(results)
+                }
             }
         }
     }
@@ -159,13 +154,84 @@ class PatientProfileActivity : BaseActivity() {
     }
 
     private fun updateAnalysisList(analyses: List<AnalysisResult>) {
-        if (analyses.isEmpty()) {
-            rvAnalyses.visibility = View.GONE
+        allAnalyses = analyses
+        updateAnalysisListUI()
+    }
+
+    private fun updateAnalysisListUI() {
+        val tvViewAll = findViewById<TextView>(R.id.tvViewAll)
+        analysisListContainer.removeAllViews()
+
+        if (allAnalyses.isEmpty()) {
+            analysisListContainer.visibility = View.GONE
             emptyAnalysisState.visibility = View.VISIBLE
+            tvViewAll.visibility = View.GONE
         } else {
-            rvAnalyses.visibility = View.VISIBLE
+            analysisListContainer.visibility = View.VISIBLE
             emptyAnalysisState.visibility = View.GONE
-            adapter.submitList(analyses)
+
+            val displayList = if (allAnalyses.size > 1) {
+                tvViewAll.visibility = View.VISIBLE
+                if (isShowingAllAnalyses) {
+                    tvViewAll.text = "Show Less \u2191"
+                    allAnalyses
+                } else {
+                    tvViewAll.text = "View All \u2192"
+                    allAnalyses.take(1)
+                }
+            } else {
+                tvViewAll.visibility = View.GONE
+                allAnalyses
+            }
+
+            for (result in displayList) {
+                val cardView = LayoutInflater.from(this)
+                    .inflate(R.layout.item_analysis_card, analysisListContainer, false)
+                bindAnalysisCard(cardView, result)
+                analysisListContainer.addView(cardView)
+            }
+        }
+    }
+
+    private fun bindAnalysisCard(view: View, result: AnalysisResult) {
+        view.findViewById<TextView>(R.id.tvDate).text = dateFormat.format(Date(result.recordedAt))
+
+        val score = result.overallScore
+        val tvScore = view.findViewById<TextView>(R.id.tvScore)
+        val scoreContainer = view.findViewById<View>(R.id.scoreContainer)
+        val tvLeftKnee = view.findViewById<TextView>(R.id.tvLeftKnee)
+        val tvRightKnee = view.findViewById<TextView>(R.id.tvRightKnee)
+        val tvLeftHip = view.findViewById<TextView>(R.id.tvLeftHip)
+        val tvRightHip = view.findViewById<TextView>(R.id.tvRightHip)
+        val tvTorso = view.findViewById<TextView>(R.id.tvTorso)
+
+        if (score != null) {
+            tvScore.text = score.toInt().toString()
+            scoreContainer.setBackgroundResource(
+                when {
+                    score >= 80 -> R.drawable.score_badge_background
+                    score >= 60 -> R.drawable.badge_background
+                    else -> R.drawable.button_outline_background
+                }
+            )
+            tvLeftKnee.text = result.kneeLeftRom?.let { "${it.toInt()}\u00B0" } ?: "\u2014"
+            tvRightKnee.text = result.kneeRightRom?.let { "${it.toInt()}\u00B0" } ?: "\u2014"
+            tvLeftHip.text = result.ldjHip?.let { String.format("%.2f", it) } ?: "\u2014"
+            tvRightHip.text = "\u2014"
+            tvTorso.text = result.trunkLeanStdDeg?.let { "${it.toInt()}\u00B0" } ?: "\u2014"
+        } else {
+            tvScore.text = "\u2014"
+            tvLeftKnee.text = "\u2014"
+            tvRightKnee.text = "\u2014"
+            tvLeftHip.text = "\u2014"
+            tvRightHip.text = "\u2014"
+            tvTorso.text = "\u2014"
+        }
+
+        view.findViewById<Button>(R.id.btnViewCharts).setOnClickListener {
+            val intent = Intent(this, ResultsActivity::class.java)
+            intent.putExtra(ResultsActivity.EXTRA_RESULT_ID, result.id)
+            startActivity(intent)
         }
     }
 
@@ -293,84 +359,6 @@ class PatientProfileActivity : BaseActivity() {
 
     override fun onResume() {
         super.onResume()
-        loadPatientData()
+        // Nothing to do here — data observation is handled in startObservingData() via repeatOnLifecycle
     }
 }
-
-// Analysis Adapter
-class AnalysisAdapter(
-    private val onViewResults: (AnalysisResult) -> Unit
-) : RecyclerView.Adapter<AnalysisAdapter.AnalysisViewHolder>() {
-
-    private var analyses: List<AnalysisResult> = emptyList()
-    private val dateFormat = SimpleDateFormat("MMM d, yyyy • h:mm a", Locale.getDefault())
-
-    fun submitList(newAnalyses: List<AnalysisResult>) {
-        val oldList = analyses
-        analyses = newAnalyses
-        DiffUtil.calculateDiff(object : DiffUtil.Callback() {
-            override fun getOldListSize() = oldList.size
-            override fun getNewListSize() = newAnalyses.size
-            override fun areItemsTheSame(oldPos: Int, newPos: Int) =
-                oldList[oldPos].id == newAnalyses[newPos].id
-            override fun areContentsTheSame(oldPos: Int, newPos: Int) =
-                oldList[oldPos] == newAnalyses[newPos]
-        }).dispatchUpdatesTo(this)
-    }
-
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): AnalysisViewHolder {
-        val view = LayoutInflater.from(parent.context)
-            .inflate(R.layout.item_analysis_card, parent, false)
-        return AnalysisViewHolder(view)
-    }
-
-    override fun onBindViewHolder(holder: AnalysisViewHolder, position: Int) {
-        holder.bind(analyses[position])
-    }
-
-    override fun getItemCount() = analyses.size
-
-    inner class AnalysisViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        private val tvDate: TextView = itemView.findViewById(R.id.tvDate)
-        private val tvScore: TextView = itemView.findViewById(R.id.tvScore)
-        private val scoreContainer: View = itemView.findViewById(R.id.scoreContainer)
-        private val tvLeftKnee: TextView = itemView.findViewById(R.id.tvLeftKnee)
-        private val tvRightKnee: TextView = itemView.findViewById(R.id.tvRightKnee)
-        private val tvLeftHip: TextView = itemView.findViewById(R.id.tvLeftHip)
-        private val tvRightHip: TextView = itemView.findViewById(R.id.tvRightHip)
-        private val tvTorso: TextView = itemView.findViewById(R.id.tvTorso)
-        private val btnViewResults: Button = itemView.findViewById(R.id.btnViewCharts)
-
-        fun bind(result: AnalysisResult) {
-            tvDate.text = dateFormat.format(Date(result.recordedAt))
-
-            val score = result.overallScore
-            if (score != null) {
-                tvScore.text = score.toInt().toString()
-                scoreContainer.setBackgroundResource(
-                    when {
-                        score >= 80 -> R.drawable.score_badge_background
-                        score >= 60 -> R.drawable.badge_background
-                        else -> R.drawable.button_outline_background
-                    }
-                )
-                
-                tvLeftKnee.text = result.kneeLeftRom?.let { "${it.toInt()}°" } ?: "—"
-                tvRightKnee.text = result.kneeRightRom?.let { "${it.toInt()}°" } ?: "—"
-                tvLeftHip.text = result.ldjHip?.let { String.format("%.2f", it) } ?: "—"
-                tvRightHip.text = "—"
-                tvTorso.text = result.trunkLeanStdDeg?.let { "${it.toInt()}°" } ?: "—"
-            } else {
-                tvScore.text = "—"
-                tvLeftKnee.text = "—"
-                tvRightKnee.text = "—"
-                tvLeftHip.text = "—"
-                tvRightHip.text = "—"
-                tvTorso.text = "—"
-            }
-
-            btnViewResults.setOnClickListener { onViewResults(result) }
-        }
-    }
-}
-

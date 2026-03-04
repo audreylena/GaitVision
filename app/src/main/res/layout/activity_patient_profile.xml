@@ -1,15 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.coordinatorlayout.widget.CoordinatorLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#1A1A2E"
-    android:fillViewport="true">
+    android:background="#1A1A2E">
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical">
+        android:orientation="vertical"
+        android:paddingBottom="88dp">
 
         <!-- Header with Back Button -->
         <RelativeLayout
@@ -270,24 +276,6 @@
             </LinearLayout>
         </androidx.cardview.widget.CardView>
 
-        <!-- New Analysis Button -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnNewAnalysis"
-            android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:text="New Gait Analysis"
-            android:textColor="#FFFFFF"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:backgroundTint="#4CAF50"
-            app:cornerRadius="12dp"
-            android:layout_marginStart="16dp"
-            android:layout_marginEnd="16dp"
-            android:layout_marginBottom="24dp"
-            app:icon="@drawable/ic_movie_24"
-            app:iconTint="#FFFFFF"
-            app:iconPadding="12dp"
-            app:iconGravity="start" />
 
         <!-- Analysis History Section -->
         <LinearLayout
@@ -317,12 +305,12 @@
                 android:textSize="14sp" />
         </LinearLayout>
 
-        <!-- Analysis List -->
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/rvAnalyses"
+        <!-- Analysis List (LinearLayout instead of RecyclerView to avoid ScrollView measurement issues) -->
+        <LinearLayout
+            android:id="@+id/analysisListContainer"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:nestedScrollingEnabled="false"
+            android:orientation="vertical"
             android:paddingStart="16dp"
             android:paddingEnd="16dp"
             android:paddingBottom="24dp" />
@@ -364,3 +352,17 @@
     </LinearLayout>
 </ScrollView>
 
+    <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+        android:id="@+id/btnNewAnalysis"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_margin="24dp"
+        android:text="New Analysis"
+        android:textColor="#FFFFFF"
+        app:icon="@drawable/ic_movie_24"
+        app:iconTint="#FFFFFF"
+        app:backgroundTint="#4CAF50"
+        app:elevation="6dp" />
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

@@ -32,7 +32,10 @@ class VideoPickerActivity : BaseActivity() {
     private lateinit var tvDate: TextView
     private lateinit var btnEditDate: ImageButton
 
-    private var selectedDateMillis: Long = System.currentTimeMillis()
+    private var selectedDateMillis: Long = Calendar.getInstance().apply {
+        set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
+        set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+    }.timeInMillis
     private val dateFormat = SimpleDateFormat("MMM d, yyyy", Locale.getDefault())
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -130,9 +133,14 @@ class VideoPickerActivity : BaseActivity() {
         val datePickerDialog = DatePickerDialog(
             this,
             { _, selectedYear, selectedMonth, selectedDay ->
-                val selectedCalendar = Calendar.getInstance()
-                // Keep the time as current time, just change date
-                selectedCalendar.set(selectedYear, selectedMonth, selectedDay)
+                val selectedCalendar = Calendar.getInstance().apply {
+                    set(selectedYear, selectedMonth, selectedDay)
+                    // Normalize to start of day — time of day is not used by this app
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }
                 selectedDateMillis = selectedCalendar.timeInMillis
                 updateDateDisplay()
             },

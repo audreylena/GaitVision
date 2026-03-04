@@ -2,6 +2,7 @@ package GaitVision.com.ui
 
 import android.content.Intent
 import android.graphics.Color
+import androidx.core.content.ContextCompat
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
@@ -144,7 +145,7 @@ class AnalysisHistoryActivity : BaseActivity() {
         columns.forEach { col ->
             val tv = TextView(this).apply {
                 text = col.label
-                setTextColor(Color.parseColor("#4FC3F7"))
+                setTextColor(ContextCompat.getColor(this@AnalysisHistoryActivity, R.color.table_header_text))
                 textSize = 11f
                 typeface = android.graphics.Typeface.DEFAULT_BOLD
                 gravity = Gravity.CENTER
@@ -160,7 +161,7 @@ class AnalysisHistoryActivity : BaseActivity() {
         // "Actions" header at the end
         val actionsLabel = TextView(this).apply {
             text = "Actions"
-            setTextColor(Color.parseColor("#4FC3F7"))
+            setTextColor(ContextCompat.getColor(this@AnalysisHistoryActivity, R.color.table_header_text))
             textSize = 11f
             typeface = android.graphics.Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER

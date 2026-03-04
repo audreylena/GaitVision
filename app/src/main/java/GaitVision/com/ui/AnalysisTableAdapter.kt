@@ -1,6 +1,7 @@
 package GaitVision.com.ui
 
 import android.graphics.Color
+import androidx.core.content.ContextCompat
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -59,7 +60,7 @@ class AnalysisTableAdapter(
         val actionTv = TextView(parent.context).apply {
             text = "View →"
             textSize = 12f
-            setTextColor(Color.parseColor("#4FC3F7"))
+            setTextColor(ContextCompat.getColor(parent.context, R.color.table_header_text))
             gravity = Gravity.CENTER
             minWidth = (96 * density).toInt()
             setPadding(
@@ -79,7 +80,10 @@ class AnalysisTableAdapter(
 
         // Alternate row backgrounds for readability
         holder.row.setBackgroundColor(
-            if (position % 2 == 0) Color.parseColor("#1E1E38") else Color.parseColor("#252542")
+            if (position % 2 == 0)
+                ContextCompat.getColor(holder.row.context, R.color.table_row_even)
+            else
+                ContextCompat.getColor(holder.row.context, R.color.table_row_odd)
         )
 
         // Bind each data cell
@@ -92,11 +96,12 @@ class AnalysisTableAdapter(
             // Colour-code the Score column
             if (col.label == "Score") {
                 val score = result.overallScore
+                val ctx = tv.context
                 tv.setTextColor(when {
-                    score == null      -> Color.parseColor("#888888")
-                    score >= 80        -> Color.parseColor("#4CAF50")
-                    score >= 60        -> Color.parseColor("#FF9800")
-                    else               -> Color.parseColor("#FF5252")
+                    score == null -> ContextCompat.getColor(ctx, R.color.score_none)
+                    score >= 80   -> ContextCompat.getColor(ctx, R.color.score_good)
+                    score >= 60   -> ContextCompat.getColor(ctx, R.color.score_warn)
+                    else          -> ContextCompat.getColor(ctx, R.color.score_poor)
                 })
             } else {
                 tv.setTextColor(Color.WHITE)

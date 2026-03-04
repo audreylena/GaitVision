@@ -10,6 +10,7 @@ import android.widget.Toast
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.core.content.ContextCompat
 import GaitVision.com.R
 import GaitVision.com.data.*
 import GaitVision.com.AnalysisSession
@@ -165,16 +166,16 @@ class PatientProfileActivity : BaseActivity() {
             tvLastScore.setTextColor(scoreColor(latestScore))
         } else {
             tvLastScore.text = "—"
-            tvLastScore.setTextColor(Color.parseColor("#888888"))
+            tvLastScore.setTextColor(ContextCompat.getColor(this, R.color.score_none))
         }
 
         updateProgressChart(analyses)
     }
 
     private fun scoreColor(score: Double): Int = when {
-        score >= 80 -> Color.parseColor("#4CAF50")
-        score >= 60 -> Color.parseColor("#FF9800")
-        else        -> Color.parseColor("#FF5252")
+        score >= 80 -> ContextCompat.getColor(this, R.color.score_good)
+        score >= 60 -> ContextCompat.getColor(this, R.color.score_warn)
+        else        -> ContextCompat.getColor(this, R.color.score_poor)
     }
 
     private fun setupChart() {
@@ -203,21 +204,21 @@ class PatientProfileActivity : BaseActivity() {
                 axisMinimum = 0f
                 axisMaximum = 100f
                 setDrawGridLines(true)
-                gridColor = Color.parseColor("#22FFFFFF")
+                gridColor = ContextCompat.getColor(this@PatientProfileActivity, R.color.chart_grid)
                 removeAllLimitLines()
                 addLimitLine(LimitLine(80f, "Good").apply {
                     lineWidth = 1.5f
-                    lineColor = Color.parseColor("#4CAF50")
+                    lineColor = ContextCompat.getColor(this@PatientProfileActivity, R.color.score_good)
                     enableDashedLine(10f, 6f, 0f)
-                    textColor = Color.parseColor("#4CAF50")
+                    textColor = ContextCompat.getColor(this@PatientProfileActivity, R.color.score_good)
                     textSize = 9f
                     labelPosition = LimitLine.LimitLabelPosition.RIGHT_TOP
                 })
                 addLimitLine(LimitLine(60f, "Fair").apply {
                     lineWidth = 1.5f
-                    lineColor = Color.parseColor("#FF9800")
+                    lineColor = ContextCompat.getColor(this@PatientProfileActivity, R.color.score_warn)
                     enableDashedLine(10f, 6f, 0f)
-                    textColor = Color.parseColor("#FF9800")
+                    textColor = ContextCompat.getColor(this@PatientProfileActivity, R.color.score_warn)
                     textSize = 9f
                     labelPosition = LimitLine.LimitLabelPosition.RIGHT_TOP
                 })
@@ -247,7 +248,7 @@ class PatientProfileActivity : BaseActivity() {
             lineWidth = 3f
             circleRadius = 5f
             setDrawCircleHole(true)
-            circleHoleColor = Color.parseColor("#252542")
+            circleHoleColor = ContextCompat.getColor(this@PatientProfileActivity, R.color.table_row_odd)
             valueTextColor = Color.WHITE
             valueTextSize = 10f
             setDrawFilled(false)

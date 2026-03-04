@@ -10,6 +10,7 @@ import androidx.cardview.widget.CardView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.core.content.ContextCompat
 import GaitVision.com.R
 import GaitVision.com.data.AnalysisResult
 import GaitVision.com.data.AnalysisResultDao
@@ -63,10 +64,18 @@ class ProgressOverTimeActivity : BaseActivity() {
         )
 
         // Palette — one colour per line (cycles if more metrics than colours)
-        private val LINE_COLORS = listOf(
-            "#4FC3F7", "#4CAF50", "#FF9800", "#CE93D8",
-            "#F48FB1", "#80CBC4", "#FFCC02", "#EF9A9A",
-            "#90CAF9", "#A5D6A7"
+        // Defined as R.color references so they live in colors.xml
+        private val LINE_COLOR_RES = listOf(
+            R.color.table_header_text,   // #4FC3F7  cyan-blue
+            R.color.score_good,          // #4CAF50  green
+            R.color.score_warn,          // #FF9800  amber
+            R.color.accent_purple,       // #8B5CF6  purple
+            R.color.accent_rose,         // #F43F5E  rose
+            R.color.secondary_teal_light,// #22D3EE  teal
+            R.color.accent_amber,        // #F59E0B  yellow
+            R.color.accent_red,          // #F43F5E  red (reuse)
+            R.color.primary_blue_light,  // #60A5FA  light-blue
+            R.color.accent_green         // #10B981  emerald
         )
     }
 
@@ -127,7 +136,7 @@ class ProgressOverTimeActivity : BaseActivity() {
         // ── Card wrapper ──────────────────────────────────────────────────────
         val card = CardView(this).apply {
             radius = 12 * density
-            setCardBackgroundColor(Color.parseColor("#252542"))
+            setCardBackgroundColor(ContextCompat.getColor(this@ProgressOverTimeActivity, R.color.table_row_odd))
             cardElevation = 4 * density
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -156,7 +165,7 @@ class ProgressOverTimeActivity : BaseActivity() {
         })
 
         // ── Chart ─────────────────────────────────────────────────────────────
-        val lineColor = Color.parseColor(LINE_COLORS[colorIndex % LINE_COLORS.size])
+        val lineColor = ContextCompat.getColor(this, LINE_COLOR_RES[colorIndex % LINE_COLOR_RES.size])
         val chart = buildLineChart(metric, entries, lineColor)
         inner.addView(chart)
 
@@ -189,7 +198,7 @@ class ProgressOverTimeActivity : BaseActivity() {
 
             xAxis.apply {
                 position    = XAxis.XAxisPosition.BOTTOM
-                textColor   = Color.parseColor("#AAAAAA")
+                textColor   = ContextCompat.getColor(this@ProgressOverTimeActivity, R.color.chart_axis_text)
                 textSize    = 9f
                 setDrawGridLines(false)
                 granularity = 1f
@@ -200,23 +209,23 @@ class ProgressOverTimeActivity : BaseActivity() {
             }
 
             axisLeft.apply {
-                textColor = Color.parseColor("#AAAAAA")
+                textColor = ContextCompat.getColor(this@ProgressOverTimeActivity, R.color.chart_axis_text)
                 textSize  = 9f
                 setDrawGridLines(true)
-                gridColor = Color.parseColor("#22FFFFFF")
+                gridColor = ContextCompat.getColor(this@ProgressOverTimeActivity, R.color.chart_grid)
 
                 removeAllLimitLines()
                 metric.goodThreshold?.let { threshold ->
                     addLimitLine(LimitLine(threshold).apply {
                         lineWidth = 1.5f
-                        setLineColor(Color.parseColor("#4CAF50"))
+                        setLineColor(ContextCompat.getColor(this@ProgressOverTimeActivity, R.color.score_good))
                         enableDashedLine(10f, 6f, 0f)
                     })
                 }
                 metric.warnThreshold?.let { threshold ->
                     addLimitLine(LimitLine(threshold).apply {
                         lineWidth = 1.5f
-                        setLineColor(Color.parseColor("#FF9800"))
+                        setLineColor(ContextCompat.getColor(this@ProgressOverTimeActivity, R.color.score_warn))
                         enableDashedLine(10f, 6f, 0f)
                     })
                 }
@@ -233,7 +242,7 @@ class ProgressOverTimeActivity : BaseActivity() {
                 if (entries.isEmpty()) "No data available"
                 else                   "Need at least 2 sessions to plot"
             )
-            chart.setNoDataTextColor(Color.parseColor("#666666"))
+            chart.setNoDataTextColor(ContextCompat.getColor(this, R.color.chart_no_data_text))
             chart.getPaint(com.github.mikephil.charting.charts.Chart.PAINT_INFO).textSize =
                 14f * resources.displayMetrics.scaledDensity
         } else {
@@ -243,7 +252,7 @@ class ProgressOverTimeActivity : BaseActivity() {
                 lineWidth       = 2.5f
                 circleRadius    = 4f
                 setDrawCircleHole(true)
-                circleHoleColor = Color.parseColor("#252542")
+                circleHoleColor = ContextCompat.getColor(this@ProgressOverTimeActivity, R.color.table_row_odd)
                 valueTextColor  = Color.WHITE
                 valueTextSize   = 9f
                 setDrawFilled(false)

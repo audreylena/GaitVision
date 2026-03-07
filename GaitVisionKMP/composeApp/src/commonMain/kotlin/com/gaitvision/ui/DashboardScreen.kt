@@ -37,6 +37,8 @@ import androidx.compose.material.Surface
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Share // Using Share as generic upload icon
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import kotlinx.coroutines.launch
@@ -45,6 +47,9 @@ import kotlinx.coroutines.launch
 fun DashboardScreen(
     onNavigateToCamera: () -> Unit,
     onNavigateToAnalysis: () -> Unit,
+    onNavigateToPatientList: () -> Unit,
+    onNavigateToSettings: () -> Unit,
+    onNavigateToPatientProfile: (Long) -> Unit,
     database: AppDatabase,
     videoProcessor: VideoProcessor
 ) {
@@ -80,10 +85,18 @@ fun DashboardScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("GaitVision Dashboard", style = MaterialTheme.typography.h6) },
+                title = { Text("GaitVision", style = MaterialTheme.typography.h6) },
                 backgroundColor = MaterialTheme.colors.primary,
                 contentColor = MaterialTheme.colors.onPrimary,
-                elevation = 4.dp
+                elevation = 4.dp,
+                actions = {
+                    androidx.compose.material.IconButton(onClick = onNavigateToPatientList) {
+                        Icon(androidx.compose.material.icons.Icons.Default.Person, contentDescription = "Patients")
+                    }
+                    androidx.compose.material.IconButton(onClick = onNavigateToSettings) {
+                        Icon(androidx.compose.material.icons.Icons.Default.Settings, contentDescription = "Settings")
+                    }
+                }
             )
         },
         backgroundColor = MaterialTheme.colors.background
@@ -158,7 +171,8 @@ fun DashboardScreen(
                     PatientCard(
                         name = "Patient #100${index + 1}",
                         date = "Oct ${20 - index}, 2023",
-                        score = 85 - (index * 2)
+                        score = 85 - (index * 2),
+                        onClick = { onNavigateToPatientProfile((100 + index).toLong()) }
                     )
                 }
             }
@@ -200,11 +214,11 @@ fun ActionCard(
 }
 
 @Composable
-fun PatientCard(name: String, date: String, score: Int) {
+fun PatientCard(name: String, date: String, score: Int, onClick: () -> Unit = {}) {
     Card(
         elevation = 2.dp,
         shape = RoundedCornerShape(8.dp),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)
     ) {
         Row(
             modifier = Modifier.padding(16.dp),

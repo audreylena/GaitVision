@@ -22,6 +22,7 @@ class FeatureExtractor(
     private val maxStepTimeS: Float = GaitConfig.MAX_STEP_TIME_S,
     private val stepDistanceFactor: Float = GaitConfig.STEP_DISTANCE_FACTOR,
     private val stepProminenceFactor: Float = GaitConfig.STEP_PROMINENCE_FACTOR,
+    private val minStepPeakWidthS: Float = GaitConfig.MIN_STEP_PEAK_WIDTH_S,
     private val validFramePct: Float = GaitConfig.VALID_FRAME_PCT,
     private val stepTimeTolerance: Float = GaitConfig.STEP_TIME_TOLERANCE,
     private val kneeRomMin: Float = GaitConfig.KNEE_ROM_MIN,
@@ -32,9 +33,12 @@ class FeatureExtractor(
 ) {
     companion object {
         private const val TAG = "GaitDebug"
+        private const val MAX_INTERVAL_CLEANING_ITERATIONS = 20
         
-        // Core keypoints for gait analysis
+        // Core keypoints for gait analysis (matches PC pose_backend_tasks.CORE_KEYPOINTS)
         val CORE_KEYPOINTS = intArrayOf(
+            MediaPipePoseBackend.LEFT_SHOULDER,
+            MediaPipePoseBackend.RIGHT_SHOULDER,
             MediaPipePoseBackend.LEFT_HIP,
             MediaPipePoseBackend.RIGHT_HIP,
             MediaPipePoseBackend.LEFT_KNEE,
@@ -171,8 +175,8 @@ class FeatureExtractor(
         // Step 7: Segment strides
         val strides = segmentStrides(steps, signals, poseSeq.fps)
         
-        // Step 8: Validate strides
-        val validatedStrides = validateStrides(strides, signals, poseSeq.fps)
+        // Step 8: Validate strides (use selected step signal for quality scoring)
+        val validatedStrides = validateStrides(strides, signals, poseSeq.fps, stepSignal, stepMode)
         val validStrides = validatedStrides.filter { it.isValid }
         Log.d(TAG, "Valid strides: ${validStrides.size}")
         
@@ -190,11 +194,15 @@ class FeatureExtractor(
             else -> QualityFlag.OK
         }
         
+        val numFramesValid = signals.isValid.count { it }
+        val validFrameRate = if (poseSeq.numFramesTotal > 0) numFramesValid.toFloat() / poseSeq.numFramesTotal else 0f
         val diagnostics = createDiagnostics(
             poseSeq, qualityFlag, "",
             steps.size, validStrides.size,
             stepMode = stepMode.value,
-            selectionReason = selectionReason
+            selectionReason = selectionReason,
+            numFramesValid = numFramesValid,
+            validFrameRate = validFrameRate
         )
         
         // Store signals and strides for visualization
@@ -206,6 +214,13 @@ class FeatureExtractor(
         if (features.valid_stride_count == 0) {
             return Pair(null, diagnostics)
         }
+        
+        // Summary for PC comparison (filter logcat with: adb logcat -s GaitDebug)
+        Log.d(TAG, "=== EXTRACTION SUMMARY (compare with PC) ===")
+        Log.d(TAG, "  num_frames_valid=${diagnostics.numFramesValid}/${diagnostics.numFramesTotal}, valid_rate=${String.format("%.1f", diagnostics.validFrameRate * 100)}%")
+        Log.d(TAG, "  step_mode=$stepMode, peaks=[${steps.map { it.frameIdx }}], peak_times=[${steps.map { String.format("%.2f", it.timeS) }}]")
+        Log.d(TAG, "  selected_stride_indices=$selectedIndices, cadence=${String.format("%.1f", features.cadence_spm)} spm, stride_time=${String.format("%.2f", features.stride_time_s)} s")
+        Log.d(TAG, "  knee_rom_L=${String.format("%.1f", features.knee_left_rom)}°, knee_rom_R=${String.format("%.1f", features.knee_right_rom)}°")
         
         return Pair(features, diagnostics)
     }
@@ -954,7 +969,9 @@ class FeatureExtractor(
             validVals.std() * stepProminenceFactor
         } else 0.01f
         
-        val peaks = findPeaks(signalClean, minDistance, minProminence)
+        val minWidth = maxOf((fps * minStepPeakWidthS).toInt(), 2)
+        var peaks = findPeaks(signalClean, minDistance, minProminence)
+        peaks = filterPeaksByWidth(signalClean, peaks, minWidth)
         
         // Peak snap: recenter each peak to local maximum within ±2 frames
         // This neutralizes ±1 frame edge-case differences vs PC
@@ -968,9 +985,10 @@ class FeatureExtractor(
             Log.d(TAG, "Peak snap: no changes (peaks already at local max)")
         }
         
-        return snappedPeaks.map { idx ->
+        val steps = snappedPeaks.map { idx ->
             StepEvent(frameIdx = idx, timeS = idx.toFloat() / fps)
         }
+        return cleanStepIntervals(steps, fps)
     }
     
     /**
@@ -1094,28 +1112,83 @@ class FeatureExtractor(
         return filteredPeaks
     }
     
+    /**
+     * Filter peaks by minimum width (scipy-style: width at half prominence).
+     * Rejects narrow jitter spikes.
+     */
+    private fun filterPeaksByWidth(
+        signal: FloatArray,
+        peaks: List<Int>,
+        minWidth: Int
+    ): List<Int> {
+        if (peaks.isEmpty() || minWidth <= 1) return peaks
+        return peaks.filter { peakIdx ->
+            val peakHeight = signal[peakIdx]
+            var leftMin = signal[peakIdx]
+            for (j in maxOf(0, peakIdx - 1) downTo 0) {
+                if (signal[j] < leftMin) leftMin = signal[j]
+                if (signal[j] > peakHeight) break
+            }
+            var rightMin = signal[peakIdx]
+            for (j in (peakIdx + 1) until signal.size) {
+                if (signal[j] < rightMin) rightMin = signal[j]
+                if (signal[j] > peakHeight) break
+            }
+            val prominence = peakHeight - maxOf(leftMin, rightMin)
+            val halfHeight = peakHeight - prominence / 2f
+            var leftCross = peakIdx
+            while (leftCross > 0 && signal[leftCross - 1] >= halfHeight) leftCross--
+            var rightCross = peakIdx
+            while (rightCross < signal.size - 1 && signal[rightCross + 1] >= halfHeight) rightCross++
+            (rightCross - leftCross + 1) >= minWidth
+        }
+    }
+    
+    /**
+     * Post-hoc cleaning: remove peaks that create outlier intervals (likely jitter).
+     * Drop when BOTH adjacent intervals are < 0.5× median.
+     */
+    private fun cleanStepIntervals(steps: List<StepEvent>, fps: Float): List<StepEvent> {
+        var current = steps
+        for (_iter in 0 until MAX_INTERVAL_CLEANING_ITERATIONS) {
+            if (current.size < 3) break
+            val intervals = (0 until current.size - 1).map {
+                current[it + 1].timeS - current[it].timeS
+            }
+            val medianInt = intervals.sorted()[intervals.size / 2]
+            if (medianInt < 1e-6f) break
+            val toDrop = (1 until current.size - 1).filter { i ->
+                intervals[i - 1] < 0.5f * medianInt && intervals[i] < 0.5f * medianInt
+            }
+            if (toDrop.isEmpty()) break
+            current = current.filterIndexed { j, _ -> j !in toDrop }
+        }
+        return current
+    }
+    
     // =========================================================================
     // Stride Segmentation and Validation
     // =========================================================================
     
+    /**
+     * Segment steps into strides (2 steps each). Overlapping: peak[i]->peak[i+2] for all i.
+     * Matches PC pipeline _segment_strides. N peaks produce N-2 strides.
+     */
     private fun segmentStrides(steps: List<StepEvent>, signals: Signals, fps: Float): List<Stride> {
         val strides = mutableListOf<Stride>()
-        
-        var i = 0
-        while (i < steps.size - 1) {
+        if (steps.size < 3) return strides
+
+        val maxFrame = signals.timestamps.size - 1
+        for (i in 0 until steps.size - 2) {
             val step1 = steps[i]
             val step2 = steps[i + 1]
-            
-            val (endFrame, endTime) = if (i + 2 < steps.size) {
-                Pair(steps[i + 2].frameIdx, steps[i + 2].timeS)
-            } else {
-                val stepDur = step2.frameIdx - step1.frameIdx
-                Pair(step2.frameIdx + stepDur, step2.timeS + stepDur / fps)
-            }
-            
+            val endStep = steps[i + 2]
+            val endFrame = minOf(endStep.frameIdx, maxFrame)
+            val endTime = endStep.timeS
+
             strides.add(Stride(
                 startFrame = step1.frameIdx,
-                endFrame = minOf(endFrame, signals.timestamps.size - 1),
+                endFrame = endFrame,
                 startTimeS = step1.timeS,
                 endTimeS = endTime,
                 step1Frame = step1.frameIdx,
@@ -1123,14 +1196,17 @@ class FeatureExtractor(
                 step1TimeS = step1.timeS,
                 step2TimeS = step2.timeS
             ))
-            
-            i += 2
         }
-        
         return strides
     }
     
-    private fun validateStrides(strides: List<Stride>, signals: Signals, fps: Float): List<Stride> {
+    private fun validateStrides(
+        strides: List<Stride>,
+        signals: Signals,
+        fps: Float,
+        stepSignal: FloatArray? = null,
+        stepMode: StepSignalMode = StepSignalMode.INTER_ANKLE
+    ): List<Stride> {
         if (strides.isEmpty()) return strides
         
         val stepTimes = strides.map { it.step2TimeS - it.step1TimeS }
@@ -1211,14 +1287,41 @@ class FeatureExtractor(
             
             val timingScore = maxOf(0f, 1f - stepTimeDev / stepTimeTolerance)
             
-            val interAnkleSegment = signals.interAnkleDist.slice(start until end).filter { !it.isNaN() }
-            val signalQuality = computeSignalQualityScore(interAnkleSegment)
+            // Max invalid run (gap) - duration-based, FPS-independent
+            val segValid = signals.isValid.slice(start until end)
+            var maxInvalidRun = 0
+            var current = 0
+            for (v in segValid) {
+                if (!v) {
+                    current++
+                    maxInvalidRun = maxOf(maxInvalidRun, current)
+                } else {
+                    current = 0
+                }
+            }
+            val maxGapS = if (fps > 0) maxInvalidRun / fps else 0f
+            val gapScore = when {
+                maxGapS <= 0.15f -> 1.0f
+                maxGapS <= 0.4f -> 0.5f
+                else -> 0.4f
+            }
+            
+            // Signal quality: use step signal if available, scale by valid_pct
+            val segmentForQuality = when {
+                stepSignal != null && start < stepSignal.size && end <= stepSignal.size ->
+                    stepSignal.slice(start until end).filter { !it.isNaN() }
+                else ->
+                    signals.interAnkleDist.slice(start until end).filter { !it.isNaN() }
+            }
+            val signalQualityRaw = computeSignalQualityScore(segmentForQuality, stepMode, stepSignal)
+            val signalQuality = signalQualityRaw * validPct
             
             val qualityScore = (
-                0.20f * validPct +
+                0.28f * validPct +
                 0.20f * timingScore +
                 0.20f * romMargin.coerceIn(0f, 1f) +
-                0.40f * signalQuality
+                0.05f * gapScore +
+                0.27f * signalQuality
             )
             
             // Debug logging for quality score breakdown
@@ -1226,6 +1329,7 @@ class FeatureExtractor(
                 "validPct=${String.format("%.4f", validPct)}, " +
                 "timingScore=${String.format("%.4f", timingScore)}, " +
                 "romMargin=${String.format("%.4f", romMargin.coerceIn(0f, 1f))}, " +
+                "gapScore=${String.format("%.4f", gapScore)}, " +
                 "signalQuality=${String.format("%.4f", signalQuality)} -> total=${String.format("%.4f", qualityScore)}")
             
             stride.copy(
@@ -1240,26 +1344,42 @@ class FeatureExtractor(
         }
     }
     
-    private fun computeSignalQualityScore(segment: List<Float>): Float {
+    private fun computeSignalQualityScore(
+        segment: List<Float>,
+        stepMode: StepSignalMode = StepSignalMode.INTER_ANKLE,
+        fullSignal: FloatArray? = null
+    ): Float {
         if (segment.size < 5) return 0f
         
         val peakVal = segment.maxOrNull() ?: return 0f
         val troughVal = segment.minOrNull() ?: return 0f
         val signalRange = peakVal - troughVal
         
-        val amplitudeScore = when {
-            signalRange < 0.05f -> 0.1f
-            signalRange < 0.08f -> 0.3f
-            signalRange < 0.10f -> 0.6f
-            signalRange < 0.15f -> 1.0f
-            else -> 0.9f
-        }
+        val useRelative = stepMode != StepSignalMode.INTER_ANKLE && fullSignal != null &&
+            fullSignal.count { !it.isNaN() } >= 5
         
-        val peakScore = when {
-            peakVal < 0.06f -> 0.2f
-            peakVal < 0.10f -> 0.5f
-            peakVal < 0.15f -> 1.0f
-            else -> 0.9f
+        val (amplitudeScore, peakScore) = if (useRelative) {
+            val fullValid = fullSignal!!.filter { !it.isNaN() }
+            val globalRange = (fullValid.maxOrNull() ?: 0f) - (fullValid.minOrNull() ?: 0f)
+            val globalMax = fullValid.maxOrNull() ?: 1e-8f
+            val amplitudeRatio = if (globalRange > 1e-8f) minOf(signalRange / globalRange, 1f) else 1f
+            val peakRatio = if (globalMax > 1e-8f) minOf(peakVal / globalMax, 1f) else 1f
+            Pair(0.3f + 0.7f * amplitudeRatio, 0.3f + 0.7f * peakRatio)
+        } else {
+            val amp = when {
+                signalRange < 0.05f -> 0.1f
+                signalRange < 0.08f -> 0.3f
+                signalRange < 0.10f -> 0.6f
+                signalRange < 0.15f -> 1.0f
+                else -> 0.9f
+            }
+            val peak = when {
+                peakVal < 0.06f -> 0.2f
+                peakVal < 0.10f -> 0.5f
+                peakVal < 0.15f -> 1.0f
+                else -> 0.9f
+            }
+            Pair(amp, peak)
         }
         
         val smoothnessScore = if (segment.size > 2 && signalRange > 0.01f) {
@@ -1341,31 +1461,34 @@ class FeatureExtractor(
         }
         if (currentRun.isNotEmpty()) runs.add(currentRun.toList())
         
-        // Find best consecutive pair
+        // Find best (i, i+2) pair. With overlapping strides, stride i and i+1 overlap;
+        // we need stride i and i+2 for 4 consecutive steps. For each j, take first
+        // non-overlapping stride after it (which is i+2), then break.
         var bestPair: List<Stride>? = null
         var bestPairScore = -1f
         var bestPairIndices = listOf<Int>()
         var bestPairReason = ""
         
-        // Log all consecutive pair scores for debugging
-        Log.d(TAG, "=== CONSECUTIVE PAIR SCORES ===")
+        Log.d(TAG, "=== CONSECUTIVE PAIR SCORES (i, i+2 only) ===")
         
         for (run in runs) {
             if (run.size >= 2) {
-                for (j in 0 until run.size - 1) {
+                for (j in 0 until run.size) {
                     val (idx1, s1) = run[j]
-                    val (idx2, s2) = run[j + 1]
-                    val pairScore = s1.qualityScore + s2.qualityScore
-                    
-                    Log.d(TAG, "  Pair [$idx1, $idx2]: score=${String.format("%.4f", pairScore)} " +
-                        "(q1=${String.format("%.4f", s1.qualityScore)}, q2=${String.format("%.4f", s2.qualityScore)}) " +
-                        "frames [${s1.startFrame}..${s1.endFrame}] + [${s2.startFrame}..${s2.endFrame}]")
-                    
-                    if (pairScore > bestPairScore) {
-                        bestPairScore = pairScore
-                        bestPair = listOf(s1, s2)
-                        bestPairIndices = listOf(idx1, idx2)
-                        bestPairReason = "best_consecutive_pair"
+                    for (m in j + 1 until run.size) {
+                        val (idx2, s2) = run[m]
+                        if (s1.endFrame > s2.startFrame) continue  // overlapping, skip
+                        val pairScore = s1.qualityScore + s2.qualityScore
+                        Log.d(TAG, "  Pair [$idx1, $idx2]: score=${String.format("%.4f", pairScore)} " +
+                            "(q1=${String.format("%.4f", s1.qualityScore)}, q2=${String.format("%.4f", s2.qualityScore)}) " +
+                            "frames [${s1.startFrame}..${s1.endFrame}] + [${s2.startFrame}..${s2.endFrame}]")
+                        if (pairScore > bestPairScore) {
+                            bestPairScore = pairScore
+                            bestPair = listOf(s1, s2)
+                            bestPairIndices = listOf(idx1, idx2)
+                            bestPairReason = "best_consecutive_pair"
+                        }
+                        break  // s2 is first non-overlapping after s1 (consecutive strides only)
                     }
                 }
             }
@@ -1376,18 +1499,7 @@ class FeatureExtractor(
             return Triple(bestPair, bestPairReason, bestPairIndices)
         }
         
-        // Fallback: best non-consecutive pair by quality
-        if (validWithIdx.size >= 2) {
-            val sorted = validWithIdx.sortedByDescending { it.second.qualityScore }
-            val (idx1, s1) = sorted[0]
-            val (idx2, s2) = sorted[1]
-            
-            val orderedPair = if (idx1 < idx2) listOf(s1, s2) else listOf(s2, s1)
-            val orderedIndices = if (idx1 < idx2) listOf(idx1, idx2) else listOf(idx2, idx1)
-            
-            return Triple(orderedPair, "fallback_nonconsecutive_pair", orderedIndices)
-        }
-        
+        // No consecutive pair found - do not fall back to non-consecutive (PC parity)
         return Triple(emptyList(), "", emptyList())
     }
     
@@ -1609,15 +1721,19 @@ class FeatureExtractor(
         numSteps: Int = 0,
         numValidStrides: Int = 0,
         stepMode: String = "inter_ankle",
-        selectionReason: String = ""
+        selectionReason: String = "",
+        numFramesValid: Int? = null,
+        validFrameRate: Float? = null
     ): GaitDiagnostics {
+        val validCount = numFramesValid ?: poseSeq.frames.size
+        val validRate = validFrameRate ?: poseSeq.detectionRate
         return GaitDiagnostics(
             videoId = poseSeq.videoId,
             fpsDetected = poseSeq.fps,
             durationS = poseSeq.durationS,
             numFramesTotal = poseSeq.numFramesTotal,
-            numFramesValid = poseSeq.frames.size,
-            validFrameRate = poseSeq.detectionRate,
+            numFramesValid = validCount,
+            validFrameRate = validRate,
             numStepsDetected = numSteps,
             numStridesValid = numValidStrides,
             estimatedCadenceSpm = if (numSteps > 1 && poseSeq.durationS > 0) {

@@ -17,76 +17,35 @@ import java.util.Locale
  *
  * Exports all analysis sessions for a single patient as a multi-row CSV file.
  *
- * Motivation:
- *   GaitCsvExporter only supports single-session export (one row per call).
- *   Clinicians need longitudinal data — all sessions for a patient in one file
- *   to track progress over time, import into Excel/SPSS, or share with colleagues.
- *
- * Usage:
- *   val exporter = PatientReportExporter(context)
- *   val uri = exporter.exportPatientHistory(patientId, patientName, results)
- *   if (uri != null) exporter.shareReport(uri)
+ * Fixes applied after Gemini code review:
+ *   - FileProvider authority corrected to match AndroidManifest.xml
+ *   - SimpleDateFormat moved out of companion object (not thread-safe)
+ *   - String.format now always uses Locale.US to avoid decimal separator issues
+ *   - sanitize() applied consistently to all string fields to prevent CSV injection
  */
 class PatientReportExporter(private val context: Context) {
 
     companion object {
         private const val TAG = "PatientReportExporter"
 
-        // CSV column headers — one per field in AnalysisResult that is clinically meaningful
         private val HEADERS = listOf(
-            "session_number",
-            "recorded_at",
-            "video_file",
-            "quality_flag",
-            "valid_stride_count",
-            "step_signal_mode",
-            "fps_detected",
-            "duration_s",
-            "num_frames_total",
-            "num_frames_valid",
-            "valid_frame_rate_pct",
-            "num_steps_detected",
-            "walking_direction",
-            "was_flipped",
-            // Scores
-            "ae_score",
-            "ridge_score",
-            "pca_score",
-            "overall_score",
-            // 16 gait features
-            "cadence_spm",
-            "stride_time_s",
-            "stride_time_cv",
-            "step_time_asymmetry",
-            "stride_length_norm",
-            "stride_amp_norm",
-            "step_length_asymmetry",
-            "knee_left_rom",
-            "knee_right_rom",
-            "knee_left_max",
-            "knee_right_max",
-            "ldj_knee_left",
-            "ldj_knee_right",
-            "ldj_hip",
-            "trunk_lean_std_deg",
-            "inter_ankle_cv"
+            "session_number", "recorded_at", "video_file", "quality_flag",
+            "valid_stride_count", "step_signal_mode", "fps_detected", "duration_s",
+            "num_frames_total", "num_frames_valid", "valid_frame_rate_pct",
+            "num_steps_detected", "walking_direction", "was_flipped",
+            "ae_score", "ridge_score", "pca_score", "overall_score",
+            "cadence_spm", "stride_time_s", "stride_time_cv", "step_time_asymmetry",
+            "stride_length_norm", "stride_amp_norm", "step_length_asymmetry",
+            "knee_left_rom", "knee_right_rom", "knee_left_max", "knee_right_max",
+            "ldj_knee_left", "ldj_knee_right", "ldj_hip",
+            "trunk_lean_std_deg", "inter_ankle_cv"
         )
-
-        private val DATE_FORMAT = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
-        private val FILE_DATE_FORMAT = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault())
     }
 
-    /**
-     * Export all analysis results for a patient to a CSV file.
-     *
-     * Results are sorted oldest-first so session numbers increase chronologically,
-     * making longitudinal tracking straightforward in spreadsheet tools.
-     *
-     * @param patientId   Numeric patient ID (for filename)
-     * @param patientName Display name (written into file header comment)
-     * @param results     All AnalysisResult rows for this patient
-     * @return            FileProvider URI of the exported file, or null on failure
-     */
+    // FIX: SimpleDateFormat is not thread-safe — create per-use, not in companion object
+    private fun dateFormat() = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+    private fun fileDateFormat() = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault())
+
     fun exportPatientHistory(
         patientId: Int,
         patientName: String,
@@ -97,7 +56,6 @@ class PatientReportExporter(private val context: Context) {
             return null
         }
 
-        // Sort oldest-first for chronological session numbering
         val sorted = results.sortedBy { it.recordedAt }
 
         return try {
@@ -110,63 +68,39 @@ class PatientReportExporter(private val context: Context) {
                 }
                 writeSummarySection(writer, sorted)
             }
-
             Log.d(TAG, "Exported ${sorted.size} sessions for patient $patientId to ${file.name}")
             fileToUri(file)
-
         } catch (e: Exception) {
             Log.e(TAG, "Failed to export patient history for $patientId: ${e.message}", e)
             null
         }
     }
 
-    /**
-     * Build a share Intent for the exported file so the user can send it
-     * via email, Google Drive, WhatsApp, etc.
-     */
     fun buildShareIntent(uri: Uri, patientName: String): Intent {
         return Intent(Intent.ACTION_SEND).apply {
             type = "text/csv"
             putExtra(Intent.EXTRA_STREAM, uri)
             putExtra(Intent.EXTRA_SUBJECT, "GaitVision Report — $patientName")
-            putExtra(
-                Intent.EXTRA_TEXT,
+            putExtra(Intent.EXTRA_TEXT,
                 "Attached is the longitudinal gait analysis report for $patientName, " +
-                "exported from GaitVision."
-            )
+                "exported from GaitVision.")
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Private helpers
-    // -------------------------------------------------------------------------
-
     private fun createOutputFile(patientId: Int): File {
         val exportDir = File(context.cacheDir, "exports").also { it.mkdirs() }
-        val timestamp = FILE_DATE_FORMAT.format(Date())
+        val timestamp = fileDateFormat().format(Date())
         return File(exportDir, "patient_${patientId}_report_${timestamp}.csv")
     }
 
     private fun fileToUri(file: File): Uri {
-        return FileProvider.getUriForFile(
-            context,
-            "${context.packageName}.fileprovider",
-            file
-        )
+        // FIX: authority must match AndroidManifest.xml declaration exactly
+        return FileProvider.getUriForFile(context, "GaitVision.com.provider", file)
     }
 
-    /**
-     * Write a human-readable file header as CSV comments (lines starting with #).
-     * These are ignored by most CSV parsers but helpful when opened in a text editor.
-     */
-    private fun writeFileHeader(
-        writer: FileWriter,
-        patientName: String,
-        patientId: Int,
-        sessionCount: Int
-    ) {
-        val now = DATE_FORMAT.format(Date())
+    private fun writeFileHeader(writer: FileWriter, patientName: String, patientId: Int, sessionCount: Int) {
+        val now = dateFormat().format(Date())
         writer.write("# GaitVision Patient Longitudinal Report\n")
         writer.write("# Patient: ${sanitize(patientName)} (ID: $patientId)\n")
         writer.write("# Exported: $now\n")
@@ -182,32 +116,30 @@ class PatientReportExporter(private val context: Context) {
     }
 
     /**
-     * Convert one AnalysisResult into a CSV row.
-     * All nullable fields default to empty string (not "NaN") for cleaner
-     * spreadsheet handling — blank cells are easier to filter than "NaN" strings.
+     * FIX: sanitize() now applied to ALL string fields consistently —
+     * qualityFlag, stepSignalMode, and walkingDirection were previously missing it,
+     * which could allow CSV formula injection when opened in Excel/Sheets.
      */
     private fun writeResultRow(writer: FileWriter, sessionNumber: Int, result: AnalysisResult) {
         val row = buildList {
             add(sessionNumber.toString())
-            add(DATE_FORMAT.format(Date(result.recordedAt)))
+            add(dateFormat().format(Date(result.recordedAt)))
             add(sanitize(result.videoFileName))
-            add(result.qualityFlag ?: "")
+            add(sanitize(result.qualityFlag ?: ""))         // FIX: added sanitize()
             add(result.validStrideCount.toString())
-            add(result.stepSignalMode ?: "")
+            add(sanitize(result.stepSignalMode ?: ""))      // FIX: added sanitize()
             add(result.fpsDetected?.fmt() ?: "")
             add(result.videoLengthMicroseconds?.let { (it / 1_000_000.0).fmt() } ?: "")
             add(result.numFramesTotal.toString())
             add(result.numFramesValid.toString())
             add(result.validFrameRate?.let { (it * 100).fmt() } ?: "")
             add(result.numStepsDetected.toString())
-            add(result.walkingDirection ?: "")
+            add(sanitize(result.walkingDirection ?: ""))    // FIX: added sanitize()
             add(if (result.wasFlipped) "1" else "0")
-            // Scores
             add(result.aeScore?.fmt() ?: "")
             add(result.ridgeScore?.fmt() ?: "")
             add(result.pcaScore?.fmt() ?: "")
             add(result.overallScore?.fmt() ?: "")
-            // 16 features
             add(result.cadenceSpm?.fmt() ?: "")
             add(result.strideTimeS?.fmt() ?: "")
             add(result.strideTimeCv?.fmt() ?: "")
@@ -225,18 +157,10 @@ class PatientReportExporter(private val context: Context) {
             add(result.trunkLeanStdDeg?.fmt() ?: "")
             add(result.interAnkleCv?.fmt() ?: "")
         }
-
         writer.write(row.joinToString(","))
         writer.write("\n")
     }
 
-    /**
-     * Write a summary section at the bottom of the file showing averages
-     * across all valid sessions. Useful for quick clinical review without
-     * needing to open a spreadsheet tool.
-     *
-     * Only sessions with QualityFlag=OK are included in averages.
-     */
     private fun writeSummarySection(writer: FileWriter, results: List<AnalysisResult>) {
         val validResults = results.filter { it.qualityFlag == "OK" }
         if (validResults.isEmpty()) return
@@ -259,7 +183,6 @@ class PatientReportExporter(private val context: Context) {
         writer.write("# avg_trunk_lean_std_deg,${avg { it.trunkLeanStdDeg }}\n")
         writer.write("# avg_inter_ankle_cv,${avg { it.interAnkleCv }}\n")
 
-        // Score trend: compare first vs last valid session
         if (validResults.size >= 2) {
             val firstScore = validResults.first().aeScore
             val lastScore = validResults.last().aeScore
@@ -275,10 +198,6 @@ class PatientReportExporter(private val context: Context) {
         }
     }
 
-    /**
-     * Sanitize a value for safe CSV output.
-     * Prevents formula injection (=, +, -, @) and handles embedded commas/quotes.
-     */
     private fun sanitize(value: String): String {
         val needsQuoting = value.any { it == ',' || it == '"' || it == '\n' || it == '\r' }
         val startsWithFormula = value.firstOrNull()
@@ -290,12 +209,13 @@ class PatientReportExporter(private val context: Context) {
         }
     }
 
-    // Format a number to 4 decimal places, stripping unnecessary trailing zeros
+    // FIX: Always use Locale.US so decimal separator is always a period.
+    // Without this, devices in Germany/France output commas, breaking CSV structure.
     private fun Float.fmt(): String =
         if (this % 1.0f == 0.0f) this.toLong().toString()
-        else String.format("%.4f", this).trimEnd('0').trimEnd('.')
+        else String.format(Locale.US, "%.4f", this).trimEnd('0').trimEnd('.')
 
     private fun Double.fmt(): String =
         if (this % 1.0 == 0.0) this.toLong().toString()
-        else String.format("%.4f", this).trimEnd('0').trimEnd('.')
+        else String.format(Locale.US, "%.4f", this).trimEnd('0').trimEnd('.')
 }

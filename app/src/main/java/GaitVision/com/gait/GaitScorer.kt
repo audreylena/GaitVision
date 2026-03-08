@@ -16,9 +16,9 @@ import kotlin.math.sqrt
 
 /**
  * Gait scoring using 3 trained models:
- * 1. AE-4D-normal - Autoencoder (reconstruction error) - THIS IS USED FOR DB
+ * 1. AE-2D-tapered-latent - Autoencoder (latent: Mahalanobis) - THIS IS USED FOR DB
  * 2. Ridge - Linear regression (severity prediction)
- * 3. PCA-4 - PCA reconstruction error
+ * 3. PCA-2-all - PCA reconstruction error
  * 
  * Each model has its own scaler embedded in its JSON config.
  * Only AE score is used for the patient database.
@@ -29,10 +29,13 @@ class GaitScorer(private val context: Context) {
         private const val TAG = "GaitDebug"
         
         // Model files
-        private const val AE_CONFIG = "AE-4D-normal.json"
-        private const val AE_TFLITE = "AE-4D-normal.tflite"
+        private const val AE_CONFIG = "AE-2D-tapered-latent.json"
         private const val RIDGE_CONFIG = "Ridge.json"
-        private const val PCA_CONFIG = "PCA-4.json"
+        private const val PCA_CONFIG = "PCA-2-all.json"
+        
+        // Shared output mapping: same breakpoints for all models (0-100 input -> 0-100 output)
+        private val OUTPUT_BREAKPOINTS = floatArrayOf(50f, 70f, 85f)
+        private val OUTPUT_HEALTH_SCORES = floatArrayOf(0f, 40f, 65f, 85f, 100f)
     }
     
     // Clinical mapping config (loaded from JSON)
@@ -50,6 +53,10 @@ class GaitScorer(private val context: Context) {
     private var aeScoreP99: Float = 1f
     private var aeClinicalMapping: ClinicalMapping? = null
     private var aeAvailable = false
+    private var aeIsLatent = false
+    private var aeNormalCentroid: FloatArray? = null
+    private var aeInvCovariance: Array<FloatArray>? = null
+    private var aeLatentDim: Int = 2
     
     // Ridge model
     private var ridgeCoef: FloatArray? = null
@@ -62,10 +69,11 @@ class GaitScorer(private val context: Context) {
     private var ridgeClinicalMapping: ClinicalMapping? = null
     private var ridgeAvailable = false
     
-    // PCA model
-    private var pcaComponents: Array<FloatArray>? = null  // 4x16 matrix
+    // PCA model (latent distance to normal centroid)
+    private var pcaComponents: Array<FloatArray>? = null
     private var pcaScalerMean: FloatArray? = null
     private var pcaScalerScale: FloatArray? = null
+    private var pcaNormalCentroid: FloatArray? = null
     private var pcaScoreP1: Float = 0f
     private var pcaScoreP99: Float = 1f
     private var pcaClinicalMapping: ClinicalMapping? = null
@@ -106,38 +114,52 @@ class GaitScorer(private val context: Context) {
                 return
             }
             val config = JSONObject(configJson)
-            
+
             // Load scaler
             val scaler = config.getJSONObject("scaler")
             aeScalerMean = jsonArrayToFloatArray(scaler.getJSONArray("mean"))
             aeScalerScale = jsonArrayToFloatArray(scaler.getJSONArray("scale"))
             Log.d(TAG, "AE: Loaded scaler mean=${aeScalerMean?.size}, scale=${aeScalerScale?.size}")
-            
+
             // Load score mapping
-            val scoreMapping = config.getJSONObject("score_mapping")
-            aeScoreP1 = scoreMapping.getDouble("p1").toFloat()
-            aeScoreP99 = scoreMapping.getDouble("p99").toFloat()
-            Log.d(TAG, "AE: score_mapping p1=$aeScoreP1, p99=$aeScoreP99")
-            
-            // Load clinical mapping
+            if (config.has("score_mapping")) {
+                val scoreMapping = config.getJSONObject("score_mapping")
+                aeScoreP1 = scoreMapping.getDouble("p1").toFloat()
+                aeScoreP99 = scoreMapping.getDouble("p99").toFloat()
+                Log.d(TAG, "AE: score_mapping p1=$aeScoreP1, p99=$aeScoreP99")
+            }
+
+            // Load clinical mapping (optional; latent may use score_mapping)
             aeClinicalMapping = loadClinicalMapping(config)
             Log.d(TAG, "AE: clinical mapping loaded=${aeClinicalMapping != null}")
-            
-            // Load TFLite model
-            Log.d(TAG, "Loading AE TFLite from $AE_TFLITE...")
-            val modelBuffer = loadModelFile(AE_TFLITE)
+
+            // Latent model: has inv_covariance, normal_centroid; use encoder TFLite
+            aeIsLatent = config.has("inv_covariance") && config.has("normal_centroid")
+            val tfliteFile = if (aeIsLatent && config.has("encoder_tflite")) {
+                config.getString("encoder_tflite")
+            } else {
+                config.optString("tflite_model", "").takeIf { it.isNotEmpty() }
+            }
+
+            if (aeIsLatent) {
+                aeLatentDim = config.optInt("latent_dim", 2)
+                aeNormalCentroid = jsonArrayToFloatArray(config.getJSONArray("normal_centroid"))
+                val invCovJson = config.getJSONArray("inv_covariance")
+                aeInvCovariance = Array(invCovJson.length()) { i ->
+                    jsonArrayToFloatArray(invCovJson.getJSONArray(i))
+                }
+                Log.d(TAG, "AE: latent mode, centroid=${aeNormalCentroid?.size}, inv_cov=${aeInvCovariance?.size}x${aeInvCovariance?.getOrNull(0)?.size}")
+            }
+
+            val modelBuffer = tfliteFile?.let { loadModelFile(it) }
             if (modelBuffer != null && aeClinicalMapping != null) {
                 aeInterpreter = Interpreter(modelBuffer)
                 aeAvailable = true
-                
-                // Log model shape info
                 val interp = aeInterpreter!!
-                Log.d(TAG, "AE TFLite loaded. Input tensors: ${interp.inputTensorCount}, Output tensors: ${interp.outputTensorCount}")
-                Log.d(TAG, "AE input[0] shape: ${interp.getInputTensor(0).shape().contentToString()}")
-                Log.d(TAG, "AE output[0] shape: ${interp.getOutputTensor(0).shape().contentToString()}")
-                Log.d(TAG, "Loaded AE model: ${config.getString("model_name")}")
+                Log.d(TAG, "AE TFLite loaded. Input: ${interp.getInputTensor(0).shape().contentToString()}, Output: ${interp.getOutputTensor(0).shape().contentToString()}")
+                Log.d(TAG, "Loaded AE model: ${config.optString("model_name")} (latent=$aeIsLatent)")
             } else {
-                Log.e(TAG, "AE: Could not load TFLite model file")
+                Log.e(TAG, "AE: Could not load TFLite model file: $tfliteFile")
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to load AE model: ${e.message}")
@@ -212,7 +234,11 @@ class GaitScorer(private val context: Context) {
             pcaClinicalMapping = loadClinicalMapping(config)
             Log.d(TAG, "PCA: clinical mapping loaded=${pcaClinicalMapping != null}")
             
-            pcaAvailable = pcaClinicalMapping != null
+            // Load normal centroid (required for latent distance scoring)
+            pcaNormalCentroid = jsonArrayToFloatArray(config.getJSONArray("normal_centroid"))
+            Log.d(TAG, "PCA: normal_centroid=${pcaNormalCentroid?.size}")
+            
+            pcaAvailable = pcaClinicalMapping != null && pcaNormalCentroid != null
             Log.d(TAG, "Loaded PCA model: ${config.getString("model_name")}, available=$pcaAvailable")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to load PCA model: ${e.message}")
@@ -245,6 +271,31 @@ class GaitScorer(private val context: Context) {
             Log.w(TAG, "Could not load clinical_mapping: ${e.message}")
             null
         }
+    }
+    
+    /**
+     * Apply shared output mapping: 0-100 input -> 0-100 output.
+     * Same breakpoints [50, 70, 85] for all models. Higher input = healthier.
+     */
+    private fun applySharedOutputMapping(healthPre: Float): Float {
+        val clamped = healthPre.coerceIn(0f, 100f)
+        val breakpoints = OUTPUT_BREAKPOINTS
+        val healthScores = OUTPUT_HEALTH_SCORES
+        for (i in breakpoints.indices) {
+            if (clamped <= breakpoints[i]) {
+                val prevBreak = if (i == 0) 0f else breakpoints[i - 1]
+                val prevHealth = if (i == 0) healthScores[0] else healthScores[i]
+                val nextHealth = healthScores[i + 1]
+                val t = (clamped - prevBreak) / (breakpoints[i] - prevBreak)
+                return prevHealth + t * (nextHealth - prevHealth)
+            }
+        }
+        val lastBreak = breakpoints.last()
+        val lastHealth = healthScores[healthScores.size - 2]
+        val maxHealth = healthScores.last()
+        val lastSpan = if (breakpoints.size >= 2) breakpoints.last() - breakpoints[breakpoints.size - 2] else 15f
+        val t = ((clamped - lastBreak) / lastSpan).coerceAtMost(1f)
+        return minOf(maxHealth, lastHealth + t * (maxHealth - lastHealth))
     }
     
     /**
@@ -344,84 +395,86 @@ class GaitScorer(private val context: Context) {
     }
     
     /**
-     * Compute AE score (reconstruction error → 0-100).
+     * Compute AE score. Latent: Mahalanobis distance → 0-100. Recon: MSE → 0-100.
      * 0 = severe impairment, 100 = healthy
      */
     private fun computeAEScore(features: FloatArray): Float {
         Log.d(TAG, "--- AE SCORING ---")
-        
-        val model = aeInterpreter
-        if (model == null) {
+
+        val model = aeInterpreter ?: run {
             Log.e(TAG, "AE FAIL: interpreter is null")
             return Float.NaN
         }
-        
-        val mean = aeScalerMean
-        if (mean == null) {
+        val mean = aeScalerMean ?: run {
             Log.e(TAG, "AE FAIL: scaler mean is null")
             return Float.NaN
         }
-        
-        val scale = aeScalerScale
-        if (scale == null) {
+        val scale = aeScalerScale ?: run {
             Log.e(TAG, "AE FAIL: scaler scale is null")
             return Float.NaN
         }
-        
-        Log.d(TAG, "AE: interpreter OK, mean size=${mean.size}, scale size=${scale.size}")
-        
+
+        val numFeatures = 16
+        val normalized = scaleFeatures(features, mean, scale)
+        val inputBuffer = Array(1) { FloatArray(numFeatures) }
+        for (i in 0 until minOf(normalized.size, numFeatures)) {
+            inputBuffer[0][i] = normalized[i]
+        }
+
         try {
-            // Log TFLite model info
-            val inputTensor = model.getInputTensor(0)
-            val outputTensor = model.getOutputTensor(0)
-            Log.d(TAG, "AE TFLite input shape: ${inputTensor.shape().contentToString()}")
-            Log.d(TAG, "AE TFLite output shape: ${outputTensor.shape().contentToString()}")
-            
-            // AE model: 16 inputs → 16 reconstructed outputs
-            val numFeatures = 16
-            
-            // Normalize with AE's scaler
-            val normalized = scaleFeatures(features, mean, scale)
-            Log.d(TAG, "AE: normalized ${normalized.size} features")
-            Log.d(TAG, "AE: first 4 normalized: [${normalized.take(4).joinToString()}]")
-            
-            // Prepare input/output buffers with explicit size
-            val inputBuffer = Array(1) { FloatArray(numFeatures) }
-            val outputBuffer = Array(1) { FloatArray(numFeatures) }
-            
-            // Copy normalized features to input buffer
-            for (i in 0 until minOf(normalized.size, numFeatures)) {
-                inputBuffer[0][i] = normalized[i]
+            if (aeIsLatent) {
+                val centroid = aeNormalCentroid ?: return Float.NaN
+                val invCov = aeInvCovariance ?: return Float.NaN
+                val outputBuffer = Array(1) { FloatArray(aeLatentDim) }
+                model.run(inputBuffer, outputBuffer)
+                val z = outputBuffer[0]
+                val dist = mahalanobisDistance(z, centroid, invCov)
+                val rawScore = -dist  // higher = healthier
+                val span = aeScoreP99 - aeScoreP1
+                val healthPre = if (span != 0f) ((rawScore - aeScoreP1) / span * 100f).coerceIn(0f, 100f) else 50f
+                val healthScore = applySharedOutputMapping(healthPre)
+                Log.d(TAG, "AE: latent dist=$dist, raw=$rawScore -> healthPre=$healthPre -> healthScore=$healthScore")
+                return healthScore
+            } else {
+                val outputBuffer = Array(1) { FloatArray(numFeatures) }
+                model.run(inputBuffer, outputBuffer)
+                var mse = 0f
+                for (i in 0 until numFeatures) {
+                    val diff = inputBuffer[0][i] - outputBuffer[0][i]
+                    mse += diff * diff
+                }
+                mse /= numFeatures
+                val rawScore = -mse  // higher = healthier
+                val span = aeScoreP99 - aeScoreP1
+                val healthPre = if (span != 0f) ((rawScore - aeScoreP1) / span * 100f).coerceIn(0f, 100f) else 50f
+                val healthScore = applySharedOutputMapping(healthPre)
+                Log.d(TAG, "AE: MSE=$mse -> healthPre=$healthPre -> healthScore=$healthScore")
+                return healthScore
             }
-            
-            Log.d(TAG, "AE: running inference...")
-            
-            // Run TFLite inference
-            model.run(inputBuffer, outputBuffer)
-            
-            Log.d(TAG, "AE: inference complete")
-            Log.d(TAG, "AE: first 4 output: [${outputBuffer[0].take(4).joinToString()}]")
-            
-            // Compute MSE (reconstruction error)
-            var mse = 0f
-            for (i in 0 until numFeatures) {
-                val diff = inputBuffer[0][i] - outputBuffer[0][i]
-                mse += diff * diff
-            }
-            mse /= numFeatures
-            
-            Log.d(TAG, "AE: MSE = $mse, p1=${aeScoreP1}, p99=${aeScoreP99}")
-            
-            // Map MSE to 0-100 health score using clinical thresholds from config
-            val healthScore = applyClinicalMapping(mse, aeClinicalMapping!!)
-            Log.d(TAG, "AE: MSE=$mse -> healthScore=$healthScore")
-            return healthScore
-            
         } catch (e: Exception) {
             Log.e(TAG, "AE EXCEPTION: ${e.javaClass.simpleName}: ${e.message}")
             e.printStackTrace()
             return Float.NaN
         }
+    }
+
+    /** Mahalanobis distance: sqrt((z-mu)^T @ inv_cov @ (z-mu)) */
+    private fun mahalanobisDistance(z: FloatArray, mu: FloatArray, invCov: Array<FloatArray>): Float {
+        val d = z.size
+        val diff = FloatArray(d) { z[it] - mu[it] }
+        val invCovDiff = FloatArray(d)
+        for (i in 0 until d) {
+            var sum = 0f
+            for (j in 0 until d) {
+                sum += invCov[i][j] * diff[j]
+            }
+            invCovDiff[i] = sum
+        }
+        var quad = 0f
+        for (i in 0 until d) {
+            quad += diff[i] * invCovDiff[i]
+        }
+        return sqrt(quad.coerceAtLeast(0f))
     }
     
     /**
@@ -451,9 +504,10 @@ class GaitScorer(private val context: Context) {
             Log.d(TAG, "Ridge: raw=$rawScore, range=[$ridgeScoreMin, $ridgeScoreMax], threshold=$ridgeThreshold")
             Log.d(TAG, "Ridge: ${if (rawScore > ridgeThreshold) "HEALTHY" else "IMPAIRED"} (raw ${if (rawScore > ridgeThreshold) ">" else "<"} threshold)")
             
-            // Map raw score to 0-100 health score using clinical thresholds from config
-            val healthScore = applyClinicalMapping(rawScore, ridgeClinicalMapping!!)
-            Log.d(TAG, "Ridge: raw=$rawScore -> healthScore=$healthScore")
+            // Ridge raw = severity (0-3 scale). Use documented formula: (1 - severity/3)*100
+            val healthPre = ((1f - rawScore / 3f) * 100f).coerceIn(0f, 100f)
+            val healthScore = applySharedOutputMapping(healthPre)
+            Log.d(TAG, "Ridge: raw=$rawScore -> healthPre=$healthPre -> healthScore=$healthScore")
             return healthScore
             
         } catch (e: Exception) {
@@ -463,38 +517,19 @@ class GaitScorer(private val context: Context) {
     }
     
     /**
-     * Compute PCA score (reconstruction error → 0-100).
+     * Compute PCA score (latent distance to normal centroid → 0-100).
+     * Project to PC space, Euclidean distance to centroid, score = -dist (higher = healthier).
      */
     private fun computePCAScore(features: FloatArray): Float {
         Log.d(TAG, "--- PCA SCORING ---")
         
-        val components = pcaComponents
-        if (components == null) {
-            Log.e(TAG, "PCA FAIL: components is null")
-            return Float.NaN
-        }
-        
-        val mean = pcaScalerMean
-        if (mean == null) {
-            Log.e(TAG, "PCA FAIL: scaler mean is null")
-            return Float.NaN
-        }
-        
-        val scale = pcaScalerScale
-        if (scale == null) {
-            Log.e(TAG, "PCA FAIL: scaler scale is null")
-            return Float.NaN
-        }
-        
-        Log.d(TAG, "PCA: components=${components.size}x${components[0].size}, mean=${mean.size}, scale=${scale.size}")
+        val components = pcaComponents ?: return Float.NaN
+        val mean = pcaScalerMean ?: return Float.NaN
+        val scale = pcaScalerScale ?: return Float.NaN
+        val centroid = pcaNormalCentroid ?: return Float.NaN
         
         try {
-            // Normalize with PCA's scaler
             val normalized = scaleFeatures(features, mean, scale)
-            Log.d(TAG, "PCA: normalized ${normalized.size} features")
-            Log.d(TAG, "PCA: first 4 normalized: [${normalized.take(4).joinToString()}]")
-            
-            // Project onto PC space: pc = x @ components.T
             val nComponents = components.size
             val projected = FloatArray(nComponents)
             for (i in 0 until nComponents) {
@@ -504,32 +539,20 @@ class GaitScorer(private val context: Context) {
             }
             Log.d(TAG, "PCA: projected (${nComponents}D): [${projected.joinToString()}]")
             
-            // Reconstruct: x_recon = pc @ components
-            val reconstructed = FloatArray(normalized.size)
-            for (i in reconstructed.indices) {
-                for (j in 0 until nComponents) {
-                    if (i < components[j].size) {
-                        reconstructed[i] += projected[j] * components[j][i]
-                    }
-                }
+            var distSq = 0f
+            for (i in 0 until nComponents) {
+                val d = projected[i] - centroid[i]
+                distSq += d * d
             }
-            Log.d(TAG, "PCA: first 4 reconstructed: [${reconstructed.take(4).joinToString()}]")
+            val dist = sqrt(distSq.coerceAtLeast(0f))
+            val rawScore = -dist
+            Log.d(TAG, "PCA: dist=$dist, rawScore=$rawScore, p1=$pcaScoreP1, p99=$pcaScoreP99")
             
-            // Compute MSE
-            var mse = 0f
-            for (i in normalized.indices) {
-                val diff = normalized[i] - reconstructed[i]
-                mse += diff * diff
-            }
-            mse /= normalized.size
-            
-            Log.d(TAG, "PCA: MSE = $mse, p1=${pcaScoreP1}, p99=${pcaScoreP99}")
-            
-            // Map MSE to 0-100 health score using clinical thresholds from config
-            val healthScore = applyClinicalMapping(mse, pcaClinicalMapping!!)
-            Log.d(TAG, "PCA: MSE=$mse -> healthScore=$healthScore")
+            val span = pcaScoreP99 - pcaScoreP1
+            val healthPre = if (span != 0f) ((rawScore - pcaScoreP1) / span * 100f).coerceIn(0f, 100f) else 50f
+            val healthScore = applySharedOutputMapping(healthPre)
+            Log.d(TAG, "PCA: healthPre=$healthPre -> healthScore=$healthScore")
             return healthScore
-            
         } catch (e: Exception) {
             Log.e(TAG, "PCA EXCEPTION: ${e.javaClass.simpleName}: ${e.message}")
             e.printStackTrace()

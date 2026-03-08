@@ -33,6 +33,7 @@ class FeatureExtractor(
 ) {
     companion object {
         private const val TAG = "GaitDebug"
+        private const val MAX_INTERVAL_CLEANING_ITERATIONS = 20
         
         // Core keypoints for gait analysis (matches PC pose_backend_tasks.CORE_KEYPOINTS)
         val CORE_KEYPOINTS = intArrayOf(
@@ -970,7 +971,7 @@ class FeatureExtractor(
         
         val minWidth = maxOf((fps * minStepPeakWidthS).toInt(), 2)
         var peaks = findPeaks(signalClean, minDistance, minProminence)
-        peaks = filterPeaksByWidth(signalClean, peaks, minProminence, minWidth)
+        peaks = filterPeaksByWidth(signalClean, peaks, minWidth)
         
         // Peak snap: recenter each peak to local maximum within ±2 frames
         // This neutralizes ±1 frame edge-case differences vs PC
@@ -1118,7 +1119,6 @@ class FeatureExtractor(
     private fun filterPeaksByWidth(
         signal: FloatArray,
         peaks: List<Int>,
-        minProminence: Float,
         minWidth: Int
     ): List<Int> {
         if (peaks.isEmpty() || minWidth <= 1) return peaks
@@ -1150,7 +1150,7 @@ class FeatureExtractor(
      */
     private fun cleanStepIntervals(steps: List<StepEvent>, fps: Float): List<StepEvent> {
         var current = steps
-        for (_iter in 0 until 20) {
+        for (_iter in 0 until MAX_INTERVAL_CLEANING_ITERATIONS) {
             if (current.size < 3) break
             val intervals = (0 until current.size - 1).map {
                 current[it + 1].timeS - current[it].timeS

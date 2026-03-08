@@ -286,7 +286,7 @@ class GaitScorer(private val context: Context) {
         for (i in breakpoints.indices) {
             if (clamped <= breakpoints[i]) {
                 val prevBreak = if (i == 0) 0f else breakpoints[i - 1]
-                val prevHealth = if (i == 0) healthScores[0] else healthScores[i]
+                val prevHealth = healthScores[i]
                 val nextHealth = healthScores[i + 1]
                 val t = (clamped - prevBreak) / (breakpoints[i] - prevBreak)
                 return prevHealth + t * (nextHealth - prevHealth)
@@ -335,7 +335,7 @@ class GaitScorer(private val context: Context) {
             for (i in breakpoints.indices) {
                 if (rawScore <= breakpoints[i]) {
                     val prevBreak = if (i == 0) 0f else breakpoints[i - 1]
-                    val prevHealth = if (i == 0) healthScores[0] else healthScores[i]
+                    val prevHealth = healthScores[i]
                     val nextHealth = healthScores[i + 1]
                     val t = (rawScore - prevBreak) / (breakpoints[i] - prevBreak)
                     return prevHealth + t * (nextHealth - prevHealth)

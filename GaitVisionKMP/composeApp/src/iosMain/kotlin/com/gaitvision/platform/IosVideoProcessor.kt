@@ -37,7 +37,7 @@ class IOSVideoProcessor : VideoProcessor {
         
         val videoTrack = asset.tracksWithMediaType(AVMediaTypeVideo).firstOrNull() as? AVAssetTrack ?: return@withContext null
         
-        val readerOutputSettings = mapOf(
+        val readerOutputSettings: Map<Any?, Any?> = mapOf(
             kCVPixelBufferPixelFormatTypeKey to kCVPixelFormatType_32BGRA
         )
         val readerOutput = AVAssetReaderTrackOutput(videoTrack, readerOutputSettings)
@@ -48,7 +48,7 @@ class IOSVideoProcessor : VideoProcessor {
         }
 
         val writer = AVAssetWriter.assetWriterWithURL(outputUrl, "com.apple.quicktime-movie", null) ?: return@withContext null
-        val writerInputSettings = mapOf(
+        val writerInputSettings: Map<Any?, Any?> = mapOf(
             AVVideoCodecKey to AVVideoCodecTypeH264,
             AVVideoWidthKey to videoTrack.naturalSize.useContents { width },
             AVVideoHeightKey to videoTrack.naturalSize.useContents { height }
@@ -56,7 +56,7 @@ class IOSVideoProcessor : VideoProcessor {
         val writerInput = AVAssetWriterInput(mediaType = AVMediaTypeVideo, outputSettings = writerInputSettings)
         writerInput.expectsMediaDataInRealTime = false
         
-        val adaptorAttributes = mapOf(
+        val adaptorAttributes: Map<Any?, Any?> = mapOf(
             kCVPixelBufferPixelFormatTypeKey to kCVPixelFormatType_32BGRA,
             kCVPixelBufferWidthKey to videoTrack.naturalSize.useContents { width },
             kCVPixelBufferHeightKey to videoTrack.naturalSize.useContents { height }
@@ -71,7 +71,7 @@ class IOSVideoProcessor : VideoProcessor {
 
         if (!reader.startReading()) return@withContext null
         if (!writer.startWriting()) return@withContext null
-        writer.startSessionAtSourceTime(kCMTimeZero)
+        writer.startSessionAtSourceTime(CMTimeMake(0, 1))
 
         val queue = platform.darwin.dispatch_queue_create("videoProcessingQueue", null)
         
@@ -144,7 +144,7 @@ class IOSVideoProcessor : VideoProcessor {
         val colorSpace = CGColorSpaceCreateDeviceRGB()
         
         // kCGBitmapByteOrder32Little | kCGImageAlphaPremultipliedFirst is typical for BGRA
-        val bitmapInfo = kCGBitmapByteOrder32Little or kCGImageAlphaPremultipliedFirst
+        val bitmapInfo = kCGBitmapByteOrder32Little or 1u // kCGImageAlphaPremultipliedFirst = 1
         
         return CGBitmapContextCreate(data, width, height, 8u, stride, colorSpace, bitmapInfo)
     }

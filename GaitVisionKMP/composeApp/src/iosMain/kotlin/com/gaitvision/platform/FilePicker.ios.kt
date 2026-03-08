@@ -10,7 +10,6 @@ import platform.Foundation.NSURL
 import platform.darwin.NSObject
 import platform.UniformTypeIdentifiers.UTTypeMovie
 import platform.UniformTypeIdentifiers.UTTypeVideo
-import platform.UniformTypeIdentifiers.UTTypeMPEG4
 
 actual class FilePicker actual constructor(
     private val onFilePicked: (String?) -> Unit
@@ -32,7 +31,7 @@ actual class FilePicker actual constructor(
     }
 
     actual fun launch() {
-        val types = listOf(UTTypeMovie, UTTypeVideo, UTTypeMPEG4)
+        val types = listOf(UTTypeMovie, UTTypeVideo)
         val picker = UIDocumentPickerViewController(forOpeningContentTypes = types, asCopy = true)
         picker.delegate = delegate
         

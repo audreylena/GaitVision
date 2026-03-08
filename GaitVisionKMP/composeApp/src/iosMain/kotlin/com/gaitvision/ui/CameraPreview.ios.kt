@@ -50,7 +50,6 @@ actual fun CameraPreview(
         factory = {
             val view = UIView()
             view.backgroundColor = UIColor.blackColor
-            cameraController.view.frame = view.bounds
             view.addSubview(cameraController.view)
             cameraController.setupPreviewLayer(view)
             view
@@ -93,8 +92,8 @@ private class CameraViewController(
         captureSession.beginConfiguration()
 
         val device = AVCaptureDevice.defaultDeviceWithMediaType(AVMediaTypeVideo) ?: return
-        val input = try {
-            AVCaptureDeviceInput.deviceInputWithDevice(device, null)
+        val input: AVCaptureDeviceInput = try {
+            AVCaptureDeviceInput.deviceInputWithDevice(device, null) ?: return
         } catch (e: Exception) {
             return
         }

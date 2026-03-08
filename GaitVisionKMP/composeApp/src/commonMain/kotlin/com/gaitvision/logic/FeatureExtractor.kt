@@ -433,13 +433,13 @@ class FeatureExtractor(
         val mag2 = sqrt(v2x * v2x + v2y * v2y)
         
         val cosAngle = (dot / (mag1 * mag2 + 1e-8f)).coerceIn(-1f, 1f)
-        return Math.toDegrees(acos(cosAngle).toDouble()).toFloat()
+        return ((180.0 / PI) * acos(cosAngle)).toFloat()
     }
     
     private fun computeTrunkLean(midShoulder: FloatArray, midHip: FloatArray): Float {
         val dx = midShoulder[0] - midHip[0]
         val dy = midShoulder[1] - midHip[1]
-        return Math.toDegrees(atan2(dx, -dy).toDouble()).toFloat()
+        return ((180.0 / PI) * atan2(dx, -dy)).toFloat()
     }
     
     // =========================================================================

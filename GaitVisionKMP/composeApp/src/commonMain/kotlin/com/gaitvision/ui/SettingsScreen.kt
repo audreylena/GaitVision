@@ -19,7 +19,8 @@ import androidx.compose.ui.unit.dp
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
     onNavigateToHelp: () -> Unit,
-    onNavigateToInfo: () -> Unit
+    onNavigateToInfo: () -> Unit,
+    onNavigateToCsv: () -> Unit
 ) {
     var notificationEnabled by remember { mutableStateOf(true) }
     var darkThemeEnabled by remember { mutableStateOf(false) }
@@ -70,9 +71,13 @@ fun SettingsScreen(
             }
             
             item {
-                Divider(color = Color.LightGray, thickness = 1.dp, modifier = Modifier.padding(vertical = 16.dp))
+                SettingActionRow(title = "Data / CSV", onClick = onNavigateToCsv)
             }
-            
+
+            item {
+                Divider(color = Color.LightGray, thickness = 1.dp, modifier = Modifier.padding(vertical = 16.dp))
+            }            
+
             item {
                 Text(
                     text = "Support & About",

@@ -23,6 +23,7 @@ object Screen {
     const val Settings = "settings"
     const val Help = "help"
     const val Info = "info"
+    const val Csv = "csv"
 
     fun createPatientProfileRoute(patientId: Long) = "patient_profile/$patientId"
     fun createResultsRoute(scoreId: Long) = "results/$scoreId"
@@ -130,7 +131,8 @@ fun AppNavigation(
             SettingsScreen(
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToHelp = { navController.navigate(Screen.Help) },
-                onNavigateToInfo = { navController.navigate(Screen.Info) }
+                onNavigateToInfo = { navController.navigate(Screen.Info) },
+                onNavigateToCsv = { navController.navigate(Screen.Csv) }
             )
         }
         
@@ -142,6 +144,12 @@ fun AppNavigation(
         
         composable(Screen.Info) {
             InfoScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Screen.Csv) {
+            CsvScreen(
                 onNavigateBack = { navController.popBackStack() }
             )
         }

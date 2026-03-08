@@ -39,20 +39,12 @@ class GaitScorer(private val context: Context) {
         private val OUTPUT_HEALTH_SCORES = floatArrayOf(0f, 40f, 65f, 85f, 100f)
     }
     
-    // Clinical mapping config (loaded from JSON)
-    private data class ClinicalMapping(
-        val lowerIsBetter: Boolean,
-        val breakpoints: FloatArray,
-        val healthScores: FloatArray
-    )
-    
     // AE model
     private var aeInterpreter: Interpreter? = null
     private var aeScalerMean: FloatArray? = null
     private var aeScalerScale: FloatArray? = null
     private var aeScoreP1: Float = 0f
     private var aeScoreP99: Float = 1f
-    private var aeClinicalMapping: ClinicalMapping? = null
     private var aeAvailable = false
     private var aeIsLatent = false
     private var aeNormalCentroid: FloatArray? = null
@@ -67,7 +59,6 @@ class GaitScorer(private val context: Context) {
     private var ridgeScoreMin: Float = 0f      // From score_range
     private var ridgeScoreMax: Float = 100f    // From score_range
     private var ridgeThreshold: Float = 75f    // Classification threshold
-    private var ridgeClinicalMapping: ClinicalMapping? = null
     private var ridgeAvailable = false
     
     // PCA model (latent distance to normal centroid)
@@ -77,7 +68,6 @@ class GaitScorer(private val context: Context) {
     private var pcaNormalCentroid: FloatArray? = null
     private var pcaScoreP1: Float = 0f
     private var pcaScoreP99: Float = 1f
-    private var pcaClinicalMapping: ClinicalMapping? = null
     private var pcaAvailable = false
     
     private var isInitialized = false
@@ -130,10 +120,6 @@ class GaitScorer(private val context: Context) {
                 Log.d(TAG, "AE: score_mapping p1=$aeScoreP1, p99=$aeScoreP99")
             }
 
-            // Load clinical mapping (optional; latent may use score_mapping)
-            aeClinicalMapping = loadClinicalMapping(config)
-            Log.d(TAG, "AE: clinical mapping loaded=${aeClinicalMapping != null}")
-
             // Latent model: has inv_covariance, normal_centroid; use encoder TFLite
             aeIsLatent = config.has("inv_covariance") && config.has("normal_centroid")
             val tfliteFile = if (aeIsLatent && config.has("encoder_tflite")) {
@@ -153,7 +139,7 @@ class GaitScorer(private val context: Context) {
             }
 
             val modelBuffer = tfliteFile?.let { loadModelFile(it) }
-            if (modelBuffer != null && aeClinicalMapping != null) {
+            if (modelBuffer != null && aeNormalCentroid != null && aeInvCovariance != null) {
                 aeInterpreter = Interpreter(modelBuffer)
                 aeAvailable = true
                 val interp = aeInterpreter!!
@@ -189,13 +175,9 @@ class GaitScorer(private val context: Context) {
             ridgeScoreMax = scoreRange.getDouble("max").toFloat()
             ridgeThreshold = config.getDouble("threshold").toFloat()
             
-            // Load clinical mapping
-            ridgeClinicalMapping = loadClinicalMapping(config)
-            Log.d(TAG, "Ridge: clinical mapping loaded=${ridgeClinicalMapping != null}")
-            
             Log.d(TAG, "Ridge: range=[$ridgeScoreMin, $ridgeScoreMax], threshold=$ridgeThreshold")
             
-            ridgeAvailable = ridgeClinicalMapping != null
+            ridgeAvailable = ridgeCoef != null && ridgeScalerMean != null && ridgeScalerScale != null
             Log.d(TAG, "Loaded Ridge model: ${config.getString("model_name")}, available=$ridgeAvailable")
         } catch (e: Exception) {
             Log.w(TAG, "Failed to load Ridge model: ${e.message}")
@@ -232,46 +214,15 @@ class GaitScorer(private val context: Context) {
             pcaScoreP99 = scoreMapping.getDouble("p99").toFloat()
             Log.d(TAG, "PCA: score_mapping p1=$pcaScoreP1, p99=$pcaScoreP99")
             
-            // Load clinical mapping
-            pcaClinicalMapping = loadClinicalMapping(config)
-            Log.d(TAG, "PCA: clinical mapping loaded=${pcaClinicalMapping != null}")
-            
             // Load normal centroid (required for latent distance scoring)
             pcaNormalCentroid = jsonArrayToFloatArray(config.getJSONArray("normal_centroid"))
             Log.d(TAG, "PCA: normal_centroid=${pcaNormalCentroid?.size}")
             
-            pcaAvailable = pcaClinicalMapping != null && pcaNormalCentroid != null
+            pcaAvailable = pcaNormalCentroid != null && pcaComponents != null
             Log.d(TAG, "Loaded PCA model: ${config.getString("model_name")}, available=$pcaAvailable")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to load PCA model: ${e.message}")
             e.printStackTrace()
-        }
-    }
-    
-    /**
-     * Load clinical mapping from JSON config.
-     * Returns null if not present (falls back to hardcoded defaults).
-     */
-    private fun loadClinicalMapping(config: JSONObject): ClinicalMapping? {
-        return try {
-            if (!config.has("clinical_mapping")) return null
-            
-            val mapping = config.getJSONObject("clinical_mapping")
-            val lowerIsBetter = mapping.getBoolean("lower_is_better")
-            val breakpointsJson = mapping.getJSONArray("breakpoints")
-            val healthScoresJson = mapping.getJSONArray("health_scores")
-            
-            val breakpoints = FloatArray(breakpointsJson.length()) { 
-                breakpointsJson.getDouble(it).toFloat() 
-            }
-            val healthScores = FloatArray(healthScoresJson.length()) { 
-                healthScoresJson.getDouble(it).toFloat() 
-            }
-            
-            ClinicalMapping(lowerIsBetter, breakpoints, healthScores)
-        } catch (e: Exception) {
-            Log.w(TAG, "Could not load clinical_mapping: ${e.message}")
-            null
         }
     }
     
@@ -298,57 +249,6 @@ class GaitScorer(private val context: Context) {
         val lastSpan = if (breakpoints.size >= 2) breakpoints.last() - breakpoints[breakpoints.size - 2] else 15f
         val t = ((clamped - lastBreak) / lastSpan).coerceAtMost(1f)
         return minOf(maxHealth, lastHealth + t * (maxHealth - lastHealth))
-    }
-    
-    /**
-     * Apply clinical mapping to convert raw score to 0-100 health score.
-     * Uses piecewise linear interpolation between breakpoints.
-     */
-    private fun applyClinicalMapping(rawScore: Float, mapping: ClinicalMapping): Float {
-        val breakpoints = mapping.breakpoints
-        val healthScores = mapping.healthScores
-        
-        // Find which segment the score falls into
-        if (mapping.lowerIsBetter) {
-            // Lower raw = healthier (MSE-based: AE, PCA)
-            // healthScores[0] = score at raw=0, healthScores[n] = score at raw=infinity
-            for (i in breakpoints.indices) {
-                if (rawScore <= breakpoints[i]) {
-                    val prevBreak = if (i == 0) 0f else breakpoints[i - 1]
-                    val prevHealth = healthScores[i]
-                    val nextHealth = healthScores[i + 1]
-                    val t = (rawScore - prevBreak) / (breakpoints[i] - prevBreak)
-                    return prevHealth - t * (prevHealth - nextHealth)
-                }
-            }
-            // Beyond last breakpoint - extrapolate to minimum
-            val lastBreak = breakpoints.last()
-            val lastHealth = healthScores[healthScores.size - 2]
-            val minHealth = healthScores.last()
-            // Extrapolate: assume same span as last segment for gradual decline
-            val lastSpan = if (breakpoints.size >= 2) breakpoints.last() - breakpoints[breakpoints.size - 2] else lastBreak
-            val t = ((rawScore - lastBreak) / (lastSpan * 3)).coerceAtMost(1f)  // 3x span to reach minimum
-            return maxOf(minHealth, lastHealth - t * (lastHealth - minHealth))
-        } else {
-            // Higher raw = healthier (Ridge regression)
-            // healthScores[0] = score at raw=0, healthScores[n] = score at raw=infinity
-            for (i in breakpoints.indices) {
-                if (rawScore <= breakpoints[i]) {
-                    val prevBreak = if (i == 0) 0f else breakpoints[i - 1]
-                    val prevHealth = healthScores[i]
-                    val nextHealth = healthScores[i + 1]
-                    val t = (rawScore - prevBreak) / (breakpoints[i] - prevBreak)
-                    return prevHealth + t * (nextHealth - prevHealth)
-                }
-            }
-            // Beyond last breakpoint - extrapolate to maximum
-            val lastBreak = breakpoints.last()
-            val lastHealth = healthScores[healthScores.size - 2]
-            val maxHealth = healthScores.last()
-            val lastSpan = if (breakpoints.size >= 2) breakpoints.last() - breakpoints[breakpoints.size - 2] else 15f
-            val t = ((rawScore - lastBreak) / lastSpan).coerceAtMost(1f)
-            return minOf(maxHealth, lastHealth + t * (maxHealth - lastHealth))
-        }
     }
     
     /**
@@ -398,7 +298,7 @@ class GaitScorer(private val context: Context) {
     }
     
     /**
-     * Compute AE score. Latent: Mahalanobis distance → 0-100. Recon: MSE → 0-100.
+     * Compute AE score. Latent Mahalanobis distance → 0-100.
      * 0 = severe impairment, 100 = healthy
      */
     private fun computeAEScore(features: FloatArray): Float {
@@ -424,40 +324,23 @@ class GaitScorer(private val context: Context) {
             inputBuffer[0][i] = normalized[i]
         }
 
-        try {
-            if (aeIsLatent) {
-                val centroid = aeNormalCentroid ?: return Float.NaN
-                val invCov = aeInvCovariance ?: return Float.NaN
-                val outputBuffer = Array(1) { FloatArray(aeLatentDim) }
-                model.run(inputBuffer, outputBuffer)
-                val z = outputBuffer[0]
-                val dist = mahalanobisDistance(z, centroid, invCov)
-                val rawScore = -dist  // higher = healthier
-                val span = aeScoreP99 - aeScoreP1
-                val healthPre = if (span != 0f) ((rawScore - aeScoreP1) / span * 100f).coerceIn(0f, 100f) else 50f
-                val healthScore = applySharedOutputMapping(healthPre)
-                if (BuildConfig.DEBUG) Log.d(TAG, "AE: latent dist=$dist, raw=$rawScore -> healthPre=$healthPre -> healthScore=$healthScore")
-                return healthScore
-            } else {
-                val outputBuffer = Array(1) { FloatArray(numFeatures) }
-                model.run(inputBuffer, outputBuffer)
-                var mse = 0f
-                for (i in 0 until numFeatures) {
-                    val diff = inputBuffer[0][i] - outputBuffer[0][i]
-                    mse += diff * diff
-                }
-                mse /= numFeatures
-                val rawScore = -mse  // higher = healthier
-                val span = aeScoreP99 - aeScoreP1
-                val healthPre = if (span != 0f) ((rawScore - aeScoreP1) / span * 100f).coerceIn(0f, 100f) else 50f
-                val healthScore = applySharedOutputMapping(healthPre)
-                if (BuildConfig.DEBUG) Log.d(TAG, "AE: MSE=$mse -> healthPre=$healthPre -> healthScore=$healthScore")
-                return healthScore
-            }
+        return try {
+            val centroid = aeNormalCentroid ?: return Float.NaN
+            val invCov = aeInvCovariance ?: return Float.NaN
+            val outputBuffer = Array(1) { FloatArray(aeLatentDim) }
+            model.run(inputBuffer, outputBuffer)
+            val z = outputBuffer[0]
+            val dist = mahalanobisDistance(z, centroid, invCov)
+            val rawScore = -dist  // higher = healthier
+            val span = aeScoreP99 - aeScoreP1
+            val healthPre = if (span != 0f) ((rawScore - aeScoreP1) / span * 100f).coerceIn(0f, 100f) else 50f
+            val healthScore = applySharedOutputMapping(healthPre)
+            if (BuildConfig.DEBUG) Log.d(TAG, "AE: latent dist=$dist, raw=$rawScore -> healthPre=$healthPre -> healthScore=$healthScore")
+            healthScore
         } catch (e: Exception) {
             Log.e(TAG, "AE EXCEPTION: ${e.javaClass.simpleName}: ${e.message}")
             e.printStackTrace()
-            return Float.NaN
+            Float.NaN
         }
     }
 

@@ -5,6 +5,7 @@ import kotlinx.parcelize.Parcelize
 
 import android.content.Context
 import android.util.Log
+import GaitVision.com.BuildConfig
 import org.json.JSONObject
 import org.tensorflow.lite.Interpreter
 import java.io.FileInputStream
@@ -177,9 +178,10 @@ class GaitScorer(private val context: Context) {
             ridgeScalerMean = jsonArrayToFloatArray(scaler.getJSONArray("mean"))
             ridgeScalerScale = jsonArrayToFloatArray(scaler.getJSONArray("scale"))
             
-            // Load coefficients
-            ridgeCoef = jsonArrayToFloatArray(config.getJSONArray("coefficients"))
-            ridgeIntercept = config.getDouble("intercept").toFloat()
+            // Load coefficients from ridge object (single source of truth)
+            val ridge = config.getJSONObject("ridge")
+            ridgeCoef = jsonArrayToFloatArray(ridge.getJSONArray("coefficients"))
+            ridgeIntercept = ridge.getDouble("intercept").toFloat()
             
             // Load score range for proper 0-100 mapping
             val scoreRange = config.getJSONObject("score_range")
@@ -363,29 +365,30 @@ class GaitScorer(private val context: Context) {
         
         val featureArray = features.toFeatureArray()
         
-        // Log raw features for debugging
-        Log.d(TAG, "=== SCORING DEBUG ===")
-        Log.d(TAG, "Raw features (${featureArray.size}):")
-        GaitFeatures.FEATURE_COLUMNS.forEachIndexed { i, name ->
-            val value = if (i < featureArray.size) featureArray[i] else Float.NaN
-            Log.d(TAG, "  [$i] $name = $value")
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "=== SCORING DEBUG ===")
+            Log.d(TAG, "Raw features (${featureArray.size}):")
+            GaitFeatures.FEATURE_COLUMNS.forEachIndexed { i, name ->
+                val value = if (i < featureArray.size) featureArray[i] else Float.NaN
+                Log.d(TAG, "  [$i] $name = $value")
+            }
         }
         
-        // Check for NaN in input
         val nanCount = featureArray.count { it.isNaN() }
         if (nanCount > 0) {
             Log.w(TAG, "WARNING: $nanCount NaN values in input features!")
         }
         
-        // Compute each model's score (each uses its own scaler)
         val aeScore = if (aeAvailable) computeAEScore(featureArray) else Float.NaN
         val ridgeScore = if (ridgeAvailable) computeRidgeScore(featureArray) else Float.NaN
         val pcaScore = if (pcaAvailable) computePCAScore(featureArray) else Float.NaN
         
-        Log.d(TAG, "=== FINAL SCORES ===")
-        Log.d(TAG, "  AE: $aeScore (available=$aeAvailable)")
-        Log.d(TAG, "  Ridge: $ridgeScore (available=$ridgeAvailable)")
-        Log.d(TAG, "  PCA: $pcaScore (available=$pcaAvailable)")
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "=== FINAL SCORES ===")
+            Log.d(TAG, "  AE: $aeScore (available=$aeAvailable)")
+            Log.d(TAG, "  Ridge: $ridgeScore (available=$ridgeAvailable)")
+            Log.d(TAG, "  PCA: $pcaScore (available=$pcaAvailable)")
+        }
         
         return ScoringResult(
             aeScore = aeScore,           // THIS IS THE PRIMARY SCORE FOR DB
@@ -399,7 +402,7 @@ class GaitScorer(private val context: Context) {
      * 0 = severe impairment, 100 = healthy
      */
     private fun computeAEScore(features: FloatArray): Float {
-        Log.d(TAG, "--- AE SCORING ---")
+        if (BuildConfig.DEBUG) Log.d(TAG, "--- AE SCORING ---")
 
         val model = aeInterpreter ?: run {
             Log.e(TAG, "AE FAIL: interpreter is null")
@@ -433,7 +436,7 @@ class GaitScorer(private val context: Context) {
                 val span = aeScoreP99 - aeScoreP1
                 val healthPre = if (span != 0f) ((rawScore - aeScoreP1) / span * 100f).coerceIn(0f, 100f) else 50f
                 val healthScore = applySharedOutputMapping(healthPre)
-                Log.d(TAG, "AE: latent dist=$dist, raw=$rawScore -> healthPre=$healthPre -> healthScore=$healthScore")
+                if (BuildConfig.DEBUG) Log.d(TAG, "AE: latent dist=$dist, raw=$rawScore -> healthPre=$healthPre -> healthScore=$healthScore")
                 return healthScore
             } else {
                 val outputBuffer = Array(1) { FloatArray(numFeatures) }
@@ -448,7 +451,7 @@ class GaitScorer(private val context: Context) {
                 val span = aeScoreP99 - aeScoreP1
                 val healthPre = if (span != 0f) ((rawScore - aeScoreP1) / span * 100f).coerceIn(0f, 100f) else 50f
                 val healthScore = applySharedOutputMapping(healthPre)
-                Log.d(TAG, "AE: MSE=$mse -> healthPre=$healthPre -> healthScore=$healthScore")
+                if (BuildConfig.DEBUG) Log.d(TAG, "AE: MSE=$mse -> healthPre=$healthPre -> healthScore=$healthScore")
                 return healthScore
             }
         } catch (e: Exception) {
@@ -483,7 +486,7 @@ class GaitScorer(private val context: Context) {
      * We map to 0-100 using the score_range from training.
      */
     private fun computeRidgeScore(features: FloatArray): Float {
-        Log.d(TAG, "--- RIDGE SCORING ---")
+        if (BuildConfig.DEBUG) Log.d(TAG, "--- RIDGE SCORING ---")
         
         val coef = ridgeCoef ?: return Float.NaN
         val mean = ridgeScalerMean ?: return Float.NaN
@@ -492,8 +495,10 @@ class GaitScorer(private val context: Context) {
         try {
             // Normalize with Ridge's scaler
             val normalized = scaleFeatures(features, mean, scale)
-            Log.d(TAG, "Ridge: normalized ${normalized.size} features")
-            Log.d(TAG, "Ridge: first 4 normalized: [${normalized.take(4).joinToString()}]")
+            if (BuildConfig.DEBUG) {
+                Log.d(TAG, "Ridge: normalized ${normalized.size} features")
+                Log.d(TAG, "Ridge: first 4 normalized: [${normalized.take(4).joinToString()}]")
+            }
             
             // Linear prediction: raw = dot(x, coef) + intercept
             var rawScore = ridgeIntercept
@@ -501,13 +506,10 @@ class GaitScorer(private val context: Context) {
                 rawScore += normalized[i] * coef[i]
             }
             
-            Log.d(TAG, "Ridge: raw=$rawScore, range=[$ridgeScoreMin, $ridgeScoreMax], threshold=$ridgeThreshold")
-            Log.d(TAG, "Ridge: ${if (rawScore > ridgeThreshold) "HEALTHY" else "IMPAIRED"} (raw ${if (rawScore > ridgeThreshold) ">" else "<"} threshold)")
-            
             // Ridge raw = severity (0-3 scale). Use documented formula: (1 - severity/3)*100
             val healthPre = ((1f - rawScore / 3f) * 100f).coerceIn(0f, 100f)
             val healthScore = applySharedOutputMapping(healthPre)
-            Log.d(TAG, "Ridge: raw=$rawScore -> healthPre=$healthPre -> healthScore=$healthScore")
+            if (BuildConfig.DEBUG) Log.d(TAG, "Ridge: raw=$rawScore -> healthPre=$healthPre -> healthScore=$healthScore")
             return healthScore
             
         } catch (e: Exception) {
@@ -521,7 +523,7 @@ class GaitScorer(private val context: Context) {
      * Project to PC space, Euclidean distance to centroid, score = -dist (higher = healthier).
      */
     private fun computePCAScore(features: FloatArray): Float {
-        Log.d(TAG, "--- PCA SCORING ---")
+        if (BuildConfig.DEBUG) Log.d(TAG, "--- PCA SCORING ---")
         
         val components = pcaComponents ?: return Float.NaN
         val mean = pcaScalerMean ?: return Float.NaN
@@ -537,7 +539,7 @@ class GaitScorer(private val context: Context) {
                     projected[i] += normalized[j] * components[i][j]
                 }
             }
-            Log.d(TAG, "PCA: projected (${nComponents}D): [${projected.joinToString()}]")
+            if (BuildConfig.DEBUG) Log.d(TAG, "PCA: projected (${nComponents}D): [${projected.joinToString()}]")
             
             var distSq = 0f
             for (i in 0 until nComponents) {
@@ -546,12 +548,12 @@ class GaitScorer(private val context: Context) {
             }
             val dist = sqrt(distSq.coerceAtLeast(0f))
             val rawScore = -dist
-            Log.d(TAG, "PCA: dist=$dist, rawScore=$rawScore, p1=$pcaScoreP1, p99=$pcaScoreP99")
+            if (BuildConfig.DEBUG) Log.d(TAG, "PCA: dist=$dist, rawScore=$rawScore, p1=$pcaScoreP1, p99=$pcaScoreP99")
             
             val span = pcaScoreP99 - pcaScoreP1
             val healthPre = if (span != 0f) ((rawScore - pcaScoreP1) / span * 100f).coerceIn(0f, 100f) else 50f
             val healthScore = applySharedOutputMapping(healthPre)
-            Log.d(TAG, "PCA: healthPre=$healthPre -> healthScore=$healthScore")
+            if (BuildConfig.DEBUG) Log.d(TAG, "PCA: healthPre=$healthPre -> healthScore=$healthScore")
             return healthScore
         } catch (e: Exception) {
             Log.e(TAG, "PCA EXCEPTION: ${e.javaClass.simpleName}: ${e.message}")

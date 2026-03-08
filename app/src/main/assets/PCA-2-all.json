@@ -220,28 +220,18 @@
     "formula": "clip((score - p1) / (p99 - p1) * 100, 0, 100)"
   },
   "clinical_mapping": {
-    "input_type": "raw_score",
-    "lower_is_better": true,
-    "breakpoints": [
-      0.228985432500283,
-      7.296021379422888
-    ],
-    "health_scores": [
-      100,
-      100,
-      0
-    ],
-    "description": "MSE: lower=healthier. p1=0.23->100, p99=7.3->0"
+    "lower_is_better": false,
+    "breakpoints": [50.0, 70.0, 85.0],
+    "health_scores": [0.0, 40.0, 65.0, 85.0, 100.0],
+    "description": "Latent distance: smaller dist = healthier. score = -dist, then linear map, then shared piecewise."
   },
   "threshold": 78.2,
   "threshold_meaning": "health_score_below_this_is_impaired",
   "usage": {
     "step1": "Normalize input: x_norm = (x - scaler.mean) / scaler.scale",
-    "step2": "Project to PC space: pc = (x_norm - pca.mean) @ pca.components.T",
+    "step2": "Project to PC space: pc = x_norm @ pca.components.T",
     "step3": "dist = ||pc - normal_centroid||, score = -dist",
-    "step4": "Map to 0-100: (score - p1) / (p99 - p1) * 100",
-    "step5": "Classify: impaired if score > threshold",
-    "step6": "Map to 0-100: scale using score_mapping formula"
+    "step4": "Map to 0-100: (score - p1) / (p99 - p1) * 100, then apply shared breakpoints [50,70,85]"
   },
   "generated": "2026-03-07T21:45:34.031716",
   "normal_centroid": [

@@ -174,48 +174,17 @@
   "usage": {
     "step1": "Normalize: x_norm = (x - scaler.mean) / scaler.scale",
     "step2": "Predict: severity = dot(ridge.coefficients, x_norm) + ridge.intercept",
-    "step3": "Classify: impaired if severity > binary_optimal",
-    "step4": "Map to 0-100: (1 - severity / 3.0) * 100"
+    "step3": "Map to 0-100: (1 - severity / 3.0) * 100, then apply shared breakpoints [50,70,85]"
   },
-  "coefficients": [
-    -0.6272548852747445,
-    -0.3159238395055234,
-    -0.04902179715335321,
-    -0.11438595587802891,
-    -0.38824663648692803,
-    0.23801127194289765,
-    0.07608852558076631,
-    -0.21930587365210225,
-    -0.33653305710049347,
-    -0.055229910980634615,
-    -0.12288454381740496,
-    0.03115557792765603,
-    -0.02506320922527314,
-    0.14234672602735146,
-    -0.017250715998091998,
-    -0.054750259414082215
-  ],
-  "intercept": 1.254335260115607,
   "score_range": {
     "min": -0.861067422359719,
     "max": 3.916027925348145
   },
   "threshold": -Infinity,
   "clinical_mapping": {
-    "input_type": "raw_score",
     "lower_is_better": false,
-    "breakpoints": [
-      50.0,
-      70.0,
-      85.0
-    ],
-    "health_scores": [
-      0.0,
-      40.0,
-      65.0,
-      85.0,
-      100.0
-    ],
-    "description": "Raw <50: Severe (0-40), 50-70: Moderate (40-65), 70-85: Mild (65-85), >85: Healthy (85-100)"
+    "breakpoints": [50.0, 70.0, 85.0],
+    "health_scores": [0.0, 40.0, 65.0, 85.0, 100.0],
+    "description": "After (1-severity/3)*100, shared piecewise mapping applies."
   }
 }

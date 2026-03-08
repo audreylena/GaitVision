@@ -115,21 +115,19 @@
     "classify_impaired_if": "score < optimal threshold"
   },
   "clinical_mapping": {
-    "input_type": "raw_score",
     "lower_is_better": false,
-    "breakpoints": [-17.297734695291055, -0.2608794273488583],
-    "health_scores": [0, 0, 100],
-    "description": "Raw < p1: 0, p1 to p99: linear 0-100, > p99: 100"
+    "breakpoints": [50.0, 70.0, 85.0],
+    "health_scores": [0.0, 40.0, 65.0, 85.0, 100.0],
+    "description": "Latent Mahalanobis: score = -dist, linear (p1-p99)->0-100, then shared piecewise."
   },
   "threshold": 89.3,
   "threshold_meaning": "health_score_below_this_is_impaired",
   "tflite_model": "AE-2D-tapered-latent.tflite",
   "usage": {
     "step1": "Normalize: x_norm = (x - scaler.mean) / scaler.scale",
-    "step2": "Encode to latent (encoder subgraph or same model to latent layer)",
-    "step3": "Mahalanobis: d = sqrt((z-mu)^T @ inv_cov @ (z-mu)); health = -d",
-    "step4": "Health score: higher = healthier (use clinical_mapping)",
-    "step5": "Classify: impaired if health_score < threshold"
+    "step2": "Encode to latent via encoder TFLite",
+    "step3": "Mahalanobis: d = sqrt((z-mu)^T @ inv_cov @ (z-mu)); score = -d",
+    "step4": "Map to 0-100: (score - p1) / (p99 - p1) * 100, then apply shared breakpoints [50,70,85]"
   },
   "generated": "2026-03-07T21:45:35.011662",
   "encoder_tflite": "AE-2D-tapered-latent_encoder.tflite",

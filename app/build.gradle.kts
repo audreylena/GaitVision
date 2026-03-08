@@ -9,6 +9,9 @@ android {
     namespace = "GaitVision.com"
     compileSdk = 34
 
+    buildFeatures {
+        buildConfig = true
+    }
 
     defaultConfig {
         applicationId = "GaitVision.com"

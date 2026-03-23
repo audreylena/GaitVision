@@ -121,11 +121,11 @@ fun PatientProfileScreen(
                             }
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(
-                                    text = patient?.gender ?: "—",
+                                    text = patient?.biologicalSex.takeIf { !it.isNullOrBlank() } ?: "—",
                                     style = MaterialTheme.typography.h6,
                                     fontWeight = FontWeight.Bold
                                 )
-                                Text("Gender", style = MaterialTheme.typography.caption, color = Color.Gray)
+                                Text("Biological Sex", style = MaterialTheme.typography.caption, color = Color.Gray)
                             }
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(

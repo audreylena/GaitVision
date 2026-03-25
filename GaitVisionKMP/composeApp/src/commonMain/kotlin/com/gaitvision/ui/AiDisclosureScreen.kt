@@ -65,29 +65,29 @@ fun AiDisclosureScreen(
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        text = "This practice uses artificial intelligence (AI) technology to assist in analyzing your gait (walking pattern). The AI system examines video of your movement to measure joint angles, stride length, balance, and other gait parameters.",
+                        text = "Pursuant to Texas Health and Safety Code Chapter 183 (Senate Bill 1188) and the Texas Responsible AI Governance Act (House Bill 149), you are being notified that this practice uses an artificial intelligence (AI) system to assist in your care. This technology analyzes video of your movement to measure gait parameters, such as joint angles and balance, and acts as a diagnostic support tool.",
                         style = MaterialTheme.typography.body1,
                         color = MaterialTheme.colors.onSurface
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        text = "Important things to know:",
+                        text = "Important Legal and Clinical Disclosures:",
                         style = MaterialTheme.typography.subtitle1.copy(fontWeight = FontWeight.SemiBold),
                         color = MaterialTheme.colors.onSurface
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "• AI is used as a diagnostic support tool only\n" +
-                                "• All AI-generated results will be reviewed by your healthcare practitioner\n" +
-                                "• AI results do not replace professional medical judgment\n" +
-                                "• Your practitioner will make all final clinical decisions",
-                        style = MaterialTheme.typography.body1,
+                        text = "• The AI system does not provide isolated medical diagnoses and does not replace professional medical judgment.\n" +
+                                "• All AI-generated data is manually reviewed by a licensed healthcare practitioner who makes all final clinical decisions regarding your treatment.\n" +
+                                "• Certain demographic information, such as observed biological sex at birth, may be processed by the algorithm in accordance with Texas law to generate baseline comparisons.\n" +
+                                "• Your data remains physically stored in the United States and is secured in compliance with State and Federal privacy requirements.",
+                        style = MaterialTheme.typography.body2,
                         color = MaterialTheme.colors.onSurface,
                         modifier = Modifier.padding(start = 8.dp)
                     )
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(24.dp))
                     Text(
-                        text = "By tapping 'I Acknowledge' below, you confirm that you have been informed about the use of AI in your care.",
+                        text = "By tapping 'I Acknowledge' below, you confirm that you have been clearly and conspicuously informed about the use of AI in your health care services.",
                         style = MaterialTheme.typography.body2,
                         color = TextSlate,
                         fontWeight = FontWeight.Medium

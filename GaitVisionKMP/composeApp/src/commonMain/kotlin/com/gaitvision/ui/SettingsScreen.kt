@@ -79,7 +79,44 @@ fun SettingsScreen(
 
             item {
                 Divider(color = Color.LightGray, thickness = 1.dp, modifier = Modifier.padding(vertical = 16.dp))
-            }            
+            }
+
+            item {
+                Text(
+                    text = "Legal & Compliance (SB 1188)",
+                    style = MaterialTheme.typography.subtitle1,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colors.primary,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+            }
+
+            item {
+                Card(
+                    elevation = 2.dp,
+                    shape = RoundedCornerShape(8.dp),
+                    backgroundColor = Color(0xFFFFF3E0),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("AI Diagnostic Support Tools", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.body2)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            "This application uses AI for diagnostic support. All scores must be manually reviewed by a clinician. A patient-facing AI disclosure is presented prior to data capture.",
+                            style = MaterialTheme.typography.caption,
+                            color = Color.DarkGray
+                        )
+                    }
+                }
+            }
+
+            item {
+                SettingActionRow(title = "HIPAA Audit Log", onClick = { /* TODO */ })
+            }
+
+            item {
+                Divider(color = Color.LightGray, thickness = 1.dp, modifier = Modifier.padding(vertical = 16.dp))
+            }
 
             item {
                 Text(

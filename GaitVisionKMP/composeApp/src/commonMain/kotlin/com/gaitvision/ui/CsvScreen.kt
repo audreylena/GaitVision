@@ -13,13 +13,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.gaitvision.data.AppDatabase
+import com.gaitvision.data.AuditLogger
 import com.gaitvision.logic.*
 import com.gaitvision.platform.FilePicker
 import com.gaitvision.platform.rememberCsvSharer
+import kotlinx.coroutines.launch
 
 @Composable
-fun CsvScreen(onNavigateBack: () -> Unit) {
+fun CsvScreen(database: AppDatabase, onNavigateBack: () -> Unit) {
     val csvSharer = rememberCsvSharer()
+    val scope = rememberCoroutineScope()
 
     // Export state
     var exportStatus by remember { mutableStateOf("") }
@@ -137,7 +141,12 @@ fun CsvScreen(onNavigateBack: () -> Unit) {
                                 diagnostics = sampleDiagnostics,
                                 score = sampleScore,
                                 participantId = "P001",
-                                videoName = "sample_video.mp4"
+                                videoName = "sample_video.mp4",
+                                biologicalSex = "Female",
+                                isReviewed = true,
+                                reviewTimestamp = 1711310000000L,
+                                aiConsentGiven = true,
+                                consentTimestamp = 1711300000000L
                             )
                             val filename = GaitCsvExporter.generateFilename("P001")
                             val path = csvSharer.saveCsv(csv, filename)
@@ -145,6 +154,9 @@ fun CsvScreen(onNavigateBack: () -> Unit) {
                                 exportSuccess = true
                                 exportStatus = "Saved: $filename"
                                 csvSharer.shareCsv(path)
+                                scope.launch {
+                                    AuditLogger.log(database.auditLogDao(), "EXPORT_CSV", patientId = null, recordId = null)
+                                }
                             } else {
                                 exportSuccess = false
                                 exportStatus = "Export failed — check storage permissions"

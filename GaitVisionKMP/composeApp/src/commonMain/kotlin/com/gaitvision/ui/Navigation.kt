@@ -204,6 +204,7 @@ fun AppNavigation(
 
         composable(Screen.Csv) {
             CsvScreen(
+                database = database,
                 onNavigateBack = { navController.popBackStack() }
             )
         }

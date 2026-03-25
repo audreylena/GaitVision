@@ -34,6 +34,7 @@ fun PatientCreateScreen(
     var heightFeet by remember { mutableStateOf("") }
     var heightInches by remember { mutableStateOf("") }
     var notes by remember { mutableStateOf("") }
+    var biologicalSex by remember { mutableStateOf("") }
     var errorMsg by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
@@ -124,17 +125,30 @@ fun PatientCreateScreen(
                     colors = TextFieldDefaults.outlinedTextFieldColors(backgroundColor = Color(0xFF1E1E1E), unfocusedBorderColor = Color.Transparent),
                     shape = RoundedCornerShape(8.dp)
                 )
-                // Gender dropdown mockup
-                OutlinedTextField(
-                    value = "",
-                    onValueChange = { },
-                    readOnly = true,
-                    label = { Text("Gender") },
-                    placeholder = { Text("Select Gender") },
-                    modifier = Modifier.weight(1f),
-                    colors = TextFieldDefaults.outlinedTextFieldColors(backgroundColor = Color(0xFF1E1E1E), unfocusedBorderColor = Color.Transparent),
-                    shape = RoundedCornerShape(8.dp)
-                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Biological Sex *", style = MaterialTheme.typography.caption, color = TextSlate, modifier = Modifier.padding(bottom = 8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth().height(56.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            modifier = Modifier.weight(1f).fillMaxHeight().clickable { biologicalSex = "Male" },
+                            color = if (biologicalSex == "Male") PrimaryBlue.copy(alpha = 0.2f) else Color(0xFF1E1E1E),
+                            shape = RoundedCornerShape(topStart = 8.dp, bottomStart = 8.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, if (biologicalSex == "Male") PrimaryBlue else Color.Transparent)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) { Text("Male", color = if (biologicalSex == "Male") PrimaryBlue else Color.White) }
+                        }
+                        Surface(
+                            modifier = Modifier.weight(1f).fillMaxHeight().clickable { biologicalSex = "Female" },
+                            color = if (biologicalSex == "Female") PrimaryBlue.copy(alpha = 0.2f) else Color(0xFF1E1E1E),
+                            shape = RoundedCornerShape(topEnd = 8.dp, bottomEnd = 8.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, if (biologicalSex == "Female") PrimaryBlue else Color.Transparent)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) { Text("Female", color = if (biologicalSex == "Female") PrimaryBlue else Color.White) }
+                        }
+                    }
+                }
             }
             Spacer(modifier = Modifier.height(12.dp))
 
@@ -195,7 +209,7 @@ fun PatientCreateScreen(
                 Column {
                     Row(
                         modifier = Modifier.fillMaxWidth().clickable {
-                            if (firstName.isBlank() || lastName.isBlank()) {
+                            if (firstName.isBlank() || lastName.isBlank() || biologicalSex.isBlank()) {
                                 errorMsg = "Please fill in all required fields"
                             } else {
                                 scope.launch {
@@ -205,6 +219,7 @@ fun PatientCreateScreen(
                                             firstName = firstName.trim(),
                                             lastName = lastName.trim(),
                                             age = age.toIntOrNull(),
+                                            biologicalSex = biologicalSex,
                                             height = totalHeight,
                                             createdAt = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
                                         )
@@ -222,7 +237,7 @@ fun PatientCreateScreen(
                     Divider(color = MaterialTheme.colors.background)
                     Row(
                         modifier = Modifier.fillMaxWidth().clickable { 
-                            if (firstName.isBlank() || lastName.isBlank()) {
+                            if (firstName.isBlank() || lastName.isBlank() || biologicalSex.isBlank()) {
                                 errorMsg = "Please fill in all required fields"
                             } else {
                                 scope.launch {
@@ -232,6 +247,7 @@ fun PatientCreateScreen(
                                             firstName = firstName.trim(),
                                             lastName = lastName.trim(),
                                             age = age.toIntOrNull(),
+                                            biologicalSex = biologicalSex,
                                             height = totalHeight,
                                             createdAt = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
                                         )

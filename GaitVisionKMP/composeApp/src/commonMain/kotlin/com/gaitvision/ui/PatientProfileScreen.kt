@@ -18,8 +18,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.*
 import com.gaitvision.data.AppDatabase
+import com.gaitvision.data.AuditLogger
+import com.gaitvision.data.ClinicianReviewEntity
 import com.gaitvision.data.GaitScoreEntity
 import com.gaitvision.data.PatientEntity
+import kotlinx.coroutines.launch
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -38,6 +41,7 @@ fun PatientProfileScreen(
 
     LaunchedEffect(patientId) {
         patient = database.patientDao().getPatientById(patientId)
+        AuditLogger.log(database.auditLogDao(), "VIEW_PATIENT", patientId = patientId)
     }
 
     if (patient == null) {
@@ -211,8 +215,14 @@ fun PatientProfileScreen(
                 }
             } else {
                 items(scores.reversed()) { score ->
+                    val scope = rememberCoroutineScope()
+                    var review by remember { mutableStateOf<ClinicianReviewEntity?>(null) }
+                    LaunchedEffect(score.id) {
+                        review = database.clinicianReviewDao().getReviewForScore(score.id)
+                    }
                     AssessmentCard(
                         score = score,
+                        isReviewed = review?.isReviewed == true,
                         onClick = { onNavigateToResults(score.id) }
                     )
                 }
@@ -222,7 +232,7 @@ fun PatientProfileScreen(
 }
 
 @Composable
-private fun AssessmentCard(score: GaitScoreEntity, onClick: () -> Unit) {
+private fun AssessmentCard(score: GaitScoreEntity, isReviewed: Boolean = false, onClick: () -> Unit) {
     val overall = score.overallScore.toInt()
     val dateStr = try {
         val instant = Instant.fromEpochMilliseconds(score.recordedAt)
@@ -242,9 +252,21 @@ private fun AssessmentCard(score: GaitScoreEntity, onClick: () -> Unit) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text("Gait Analysis", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.subtitle1)
                 Text(dateStr, style = MaterialTheme.typography.caption, color = Color.Gray)
+                Spacer(modifier = Modifier.height(4.dp))
+                Surface(
+                    color = if (isReviewed) Color(0xFFE6F4EA) else Color(0xFFFFF3E0),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = if (isReviewed) "✓ Reviewed" else "⏳ Pending Review",
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                        style = MaterialTheme.typography.caption,
+                        color = if (isReviewed) Color(0xFF137333) else Color(0xFFE65100)
+                    )
+                }
             }
             Surface(
                 color = if (overall > 80) Color(0xFFE6F4EA) else Color(0xFFFCE8E6),

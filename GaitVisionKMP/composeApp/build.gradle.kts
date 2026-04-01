@@ -8,10 +8,8 @@ plugins {
 
 kotlin {
     androidTarget {
-        compilations.all {
-            kotlinOptions {
-                jvmTarget = "1.8"
-            }
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_1_8)
         }
     }
     
@@ -52,10 +50,10 @@ kotlin {
             implementation(compose.components.uiToolingPreview)
             implementation(libs.androidx.lifecycle.viewmodel)
             implementation(libs.androidx.lifecycle.runtime.compose)
-            implementation(libs.androidx.room.runtime)
-            implementation(libs.androidx.sqlite.bundled)
             implementation(libs.jetbrains.compose.navigation)
             implementation(libs.kotlinx.datetime)
+            implementation(libs.androidx.room.runtime)
+            implementation(libs.androidx.sqlite.bundled)
         }
     }
 }
@@ -98,3 +96,4 @@ dependencies {
     add("kspIosSimulatorArm64", libs.androidx.room.compiler)
     debugImplementation(compose.uiTooling)
 }
+

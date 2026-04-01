@@ -19,6 +19,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.unit.dp
 import com.gaitvision.data.AppDatabase
 import com.gaitvision.logic.GaitAnalyzer
@@ -29,6 +30,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Card
 import androidx.compose.material.Icon
@@ -57,6 +59,8 @@ fun DashboardScreen(
     val analyzer = remember { GaitAnalyzer() }
     var isProcessing by remember { mutableStateOf(false) }
     var progress by remember { mutableStateOf(0) }
+    
+    val recentPatients by database.patientDao().getAllPatientsFlow().collectAsState(initial = emptyList())
 
     val filePicker = remember {
         FilePicker { path ->
@@ -163,17 +167,25 @@ fun DashboardScreen(
                 modifier = Modifier.padding(bottom = 8.dp).align(Alignment.Start)
             )
             
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                items(5) { index ->
-                    PatientCard(
-                        name = "Patient #100${index + 1}",
-                        date = "Oct ${20 - index}, 2023",
-                        score = 85 - (index * 2),
-                        onClick = { onNavigateToPatientProfile((100 + index).toLong()) }
-                    )
+            if (recentPatients.isEmpty()) {
+                Text(
+                    text = "No patients available.",
+                    style = MaterialTheme.typography.body2,
+                    modifier = Modifier.padding(top = 16.dp)
+                )
+            } else {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(recentPatients.take(5)) { patient ->
+                        PatientCard(
+                            name = "${patient.firstName} ${patient.lastName}",
+                            date = "Age: ${patient.age ?: "N/A"}", // Replace with real date formatting when available
+                            score = 80, // Default mock score for now until GaitScore integration
+                            onClick = { onNavigateToPatientProfile(patient.id) }
+                        )
+                    }
                 }
             }
         }

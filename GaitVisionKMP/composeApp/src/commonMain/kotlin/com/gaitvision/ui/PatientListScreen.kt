@@ -10,26 +10,23 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.gaitvision.data.Patient
+import com.gaitvision.data.AppDatabase
+import com.gaitvision.data.PatientEntity
 
 @Composable
 fun PatientListScreen(
+    database: AppDatabase,
     onNavigateBack: () -> Unit,
     onNavigateToCreatePatient: () -> Unit,
     onNavigateToPatientProfile: (Long) -> Unit
 ) {
-    // Mock data for UI presentation
-    val patients = listOf(
-        Patient(id = 1, firstName = "John", lastName = "Doe", age = 45, height = 70),
-        Patient(id = 2, firstName = "Jane", lastName = "Smith", age = 38, height = 65),
-        Patient(id = 3, firstName = "Robert", lastName = "Johnson", age = 50, height = 72)
-    )
+    val patients by database.patientDao().getAllPatientsFlow().collectAsState(initial = emptyList())
 
     Scaffold(
         topBar = {
@@ -83,7 +80,7 @@ fun PatientListScreen(
 }
 
 @Composable
-fun PatientListItem(patient: Patient, onClick: () -> Unit) {
+fun PatientListItem(patient: PatientEntity, onClick: () -> Unit) {
     Card(
         elevation = 3.dp,
         shape = RoundedCornerShape(12.dp),
@@ -110,7 +107,7 @@ fun PatientListItem(patient: Patient, onClick: () -> Unit) {
             Spacer(modifier = Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = patient.fullName,
+                    text = "${patient.firstName} ${patient.lastName}",
                     style = MaterialTheme.typography.subtitle1,
                     fontWeight = FontWeight.Bold
                 )

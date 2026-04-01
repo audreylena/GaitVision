@@ -1,16 +1,12 @@
 package com.gaitvision.platform
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
-import platform.UIKit.UIDocumentPickerViewController
-import platform.UIKit.UIDocumentPickerDelegateProtocol
-import platform.UIKit.UIViewController
-import platform.UIKit.UIApplication
-import platform.Foundation.NSURL
-import platform.darwin.NSObject
+import platform.UIKit.*
 import platform.UniformTypeIdentifiers.UTTypeMovie
 import platform.UniformTypeIdentifiers.UTTypeVideo
-import platform.UniformTypeIdentifiers.UTTypeMPEG4
+import platform.UniformTypeIdentifiers.UTTypeCommaSeparatedText
+import platform.Foundation.NSURL
+import platform.darwin.NSObject
 
 actual class FilePicker actual constructor(
     private val onFilePicked: (String?) -> Unit
@@ -28,14 +24,26 @@ actual class FilePicker actual constructor(
 
     @Composable
     actual fun register() {
-        // No-op for iOS as we don't need to register a launcher like Android
+        // No-op on iOS
     }
 
     actual fun launch() {
-        val types = listOf(UTTypeMovie, UTTypeVideo, UTTypeMPEG4)
-        val picker = UIDocumentPickerViewController(forOpeningContentTypes = types, asCopy = true)
+        val types = listOf(UTTypeMovie, UTTypeVideo)
+        presentPicker(types)
+    }
+
+    actual fun launchCsv() {
+        val types = listOf(UTTypeCommaSeparatedText)
+        presentPicker(types)
+    }
+
+    private fun presentPicker(types: List<Any?>) {
+        @Suppress("UNCHECKED_CAST")
+        val picker = UIDocumentPickerViewController(
+            forOpeningContentTypes = types as List<platform.UniformTypeIdentifiers.UTType>,
+            asCopy = true
+        )
         picker.delegate = delegate
-        
         val rootController = UIApplication.sharedApplication.keyWindow?.rootViewController
         rootController?.presentViewController(picker, animated = true, completion = null)
     }

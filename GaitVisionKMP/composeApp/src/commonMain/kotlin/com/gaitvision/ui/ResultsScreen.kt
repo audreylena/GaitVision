@@ -12,13 +12,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.*
+import com.gaitvision.data.GaitScoreEntity
 
 @Composable
 fun ResultsScreen(
     scoreId: Long,
+    database: com.gaitvision.data.AppDatabase,
     onNavigateBack: () -> Unit,
     onNavigateToSignals: (Long) -> Unit
 ) {
+    var scoreEntity by remember { mutableStateOf<GaitScoreEntity?>(null) }
+    LaunchedEffect(scoreId) {
+        scoreEntity = database.gaitScoreDao().getScoreById(scoreId)
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -42,18 +50,19 @@ fun ResultsScreen(
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            val overall = scoreEntity?.overallScore?.toInt() ?: 0
             Surface(
                 modifier = Modifier.size(120.dp),
                 shape = RoundedCornerShape(60.dp),
-                color = if (85 > 80) Color(0xFFE6F4EA) else Color(0xFFFCE8E6),
+                color = if (overall > 80) Color(0xFFE6F4EA) else Color(0xFFFCE8E6),
                 elevation = 4.dp
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            text = "85",
+                            text = "$overall",
                             style = MaterialTheme.typography.h3,
-                            color = if (85 > 80) Color(0xFF137333) else Color(0xFFC5221F),
+                            color = if (overall > 80) Color(0xFF137333) else Color(0xFFC5221F),
                             fontWeight = FontWeight.Bold
                         )
                         Text("Overall Score", style = MaterialTheme.typography.caption)
@@ -66,11 +75,11 @@ fun ResultsScreen(
             Text("Score Breakdown", style = MaterialTheme.typography.h6, modifier = Modifier.align(Alignment.Start))
             Spacer(modifier = Modifier.height(16.dp))
             
-            ResultRow(title = "Left Knee", score = "82/100")
-            ResultRow(title = "Right Knee", score = "88/100")
-            ResultRow(title = "Left Hip", score = "90/100")
-            ResultRow(title = "Right Hip", score = "80/100")
-            ResultRow(title = "Torso Alignment", score = "85/100")
+            ResultRow(title = "Left Knee", score = "${scoreEntity?.leftKneeScore?.toInt() ?: 0}/100")
+            ResultRow(title = "Right Knee", score = "${scoreEntity?.rightKneeScore?.toInt() ?: 0}/100")
+            ResultRow(title = "Left Hip", score = "${scoreEntity?.leftHipScore?.toInt() ?: 0}/100")
+            ResultRow(title = "Right Hip", score = "${scoreEntity?.rightHipScore?.toInt() ?: 0}/100")
+            ResultRow(title = "Torso Alignment", score = "${scoreEntity?.torsoScore?.toInt() ?: 0}/100")
             
             Spacer(modifier = Modifier.weight(1f))
             

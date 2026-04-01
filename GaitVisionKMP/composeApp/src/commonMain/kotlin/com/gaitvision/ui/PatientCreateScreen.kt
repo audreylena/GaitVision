@@ -12,9 +12,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.gaitvision.data.AppDatabase
+import kotlinx.coroutines.launch
 
 @Composable
 fun PatientCreateScreen(
+    database: AppDatabase,
     onNavigateBack: () -> Unit,
     onPatientCreated: () -> Unit
 ) {
@@ -23,6 +26,7 @@ fun PatientCreateScreen(
     var age by remember { mutableStateOf("") }
     var height by remember { mutableStateOf("") }
     var errorMsg by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
 
     Scaffold(
         topBar = {
@@ -101,8 +105,18 @@ fun PatientCreateScreen(
                     if (firstName.isBlank() || lastName.isBlank() || height.toIntOrNull() == null) {
                         errorMsg = "Please fill in all required fields (Height must be a number)"
                     } else {
-                        // TODO: Save to database
-                        onPatientCreated()
+                        scope.launch {
+                            database.patientDao().insertPatient(
+                                com.gaitvision.data.PatientEntity(
+                                    firstName = firstName.trim(),
+                                    lastName = lastName.trim(),
+                                    age = age.toIntOrNull(),
+                                    height = height.toInt(),
+                                    createdAt = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
+                                )
+                            )
+                            onPatientCreated()
+                        }
                     }
                 },
                 modifier = Modifier.fillMaxWidth().height(50.dp),

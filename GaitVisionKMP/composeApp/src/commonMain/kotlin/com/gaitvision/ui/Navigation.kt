@@ -13,7 +13,7 @@ import com.gaitvision.platform.VideoProcessor
 
 object Screen {
     const val Dashboard = "dashboard"
-    const val Camera = "camera"
+    const val Camera = "camera/{patientId}"
     const val Analysis = "analysis"
     const val PatientList = "patient_list"
     const val PatientCreate = "patient_create"
@@ -25,6 +25,7 @@ object Screen {
     const val Info = "info"
     const val Csv = "csv"
 
+    fun createCameraRoute(patientId: Long) = "camera/$patientId"
     fun createPatientProfileRoute(patientId: Long) = "patient_profile/$patientId"
     fun createResultsRoute(scoreId: Long) = "results/$scoreId"
     fun createSignalsDashboardRoute(scoreId: Long) = "signals_dashboard/$scoreId"
@@ -43,45 +44,58 @@ fun AppNavigation(
     ) {
         composable(Screen.Dashboard) {
             DashboardScreen(
-                onNavigateToCamera = { navController.navigate(Screen.Camera) },
+                onNavigateToCamera = { patientId ->
+                    navController.navigate(Screen.createCameraRoute(patientId))
+                },
                 onNavigateToAnalysis = { navController.navigate(Screen.Analysis) },
                 onNavigateToPatientList = { navController.navigate(Screen.PatientList) },
                 onNavigateToSettings = { navController.navigate(Screen.Settings) },
-                onNavigateToPatientProfile = { patientId -> 
+                onNavigateToPatientProfile = { patientId ->
                     navController.navigate(Screen.createPatientProfileRoute(patientId))
+                },
+                onNavigateToResults = { scoreId ->
+                    navController.navigate(Screen.createResultsRoute(scoreId))
                 },
                 database = database,
                 videoProcessor = videoProcessor
             )
         }
-        
-        composable(Screen.Camera) {
+
+        composable(
+            route = Screen.Camera,
+            arguments = listOf(navArgument("patientId") { type = NavType.LongType })
+        ) { backStackEntry ->
+            val patientId = backStackEntry.arguments?.getLong("patientId") ?: 0L
             CameraScreen(
+                patientId = patientId,
                 onNavigateBack = { navController.popBackStack() },
-                onNavigateToAnalysis = { navController.navigate(Screen.Analysis) },
+                onNavigateToResults = { scoreId ->
+                    navController.navigate(Screen.createResultsRoute(scoreId))
+                },
                 poseDetector = poseDetector,
-                videoProcessor = videoProcessor
+                videoProcessor = videoProcessor,
+                database = database
             )
         }
-        
+
         composable(Screen.Analysis) {
             AnalysisScreen(
                 onNavigateBack = { navController.popBackStack() },
                 database = database
             )
         }
-        
+
         composable(Screen.PatientList) {
             PatientListScreen(
                 database = database,
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToCreatePatient = { navController.navigate(Screen.PatientCreate) },
-                onNavigateToPatientProfile = { patientId -> 
+                onNavigateToPatientProfile = { patientId ->
                     navController.navigate(Screen.createPatientProfileRoute(patientId))
                 }
             )
         }
-        
+
         composable(Screen.PatientCreate) {
             PatientCreateScreen(
                 database = database,
@@ -89,7 +103,7 @@ fun AppNavigation(
                 onPatientCreated = { navController.popBackStack() }
             )
         }
-        
+
         composable(
             route = Screen.PatientProfile,
             arguments = listOf(navArgument("patientId") { type = NavType.LongType })
@@ -99,12 +113,15 @@ fun AppNavigation(
                 patientId = patientId,
                 database = database,
                 onNavigateBack = { navController.popBackStack() },
-                onNavigateToResults = { scoreId -> 
+                onNavigateToResults = { scoreId ->
                     navController.navigate(Screen.createResultsRoute(scoreId))
+                },
+                onNavigateToCamera = {
+                    navController.navigate(Screen.createCameraRoute(patientId))
                 }
             )
         }
-        
+
         composable(
             route = Screen.Results,
             arguments = listOf(navArgument("scoreId") { type = NavType.LongType })
@@ -119,7 +136,7 @@ fun AppNavigation(
                 }
             )
         }
-        
+
         composable(
             route = Screen.SignalsDashboard,
             arguments = listOf(navArgument("scoreId") { type = NavType.LongType })
@@ -130,7 +147,7 @@ fun AppNavigation(
                 onNavigateBack = { navController.popBackStack() }
             )
         }
-        
+
         composable(Screen.Settings) {
             SettingsScreen(
                 onNavigateBack = { navController.popBackStack() },
@@ -139,13 +156,13 @@ fun AppNavigation(
                 onNavigateToCsv = { navController.navigate(Screen.Csv) }
             )
         }
-        
+
         composable(Screen.Help) {
             HelpScreen(
                 onNavigateBack = { navController.popBackStack() }
             )
         }
-        
+
         composable(Screen.Info) {
             InfoScreen(
                 onNavigateBack = { navController.popBackStack() }

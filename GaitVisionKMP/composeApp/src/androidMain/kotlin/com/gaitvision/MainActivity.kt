@@ -9,9 +9,14 @@ import com.gaitvision.data.AppDatabase
 import com.gaitvision.platform.AndroidPoseDetector
 import com.gaitvision.platform.AndroidVideoProcessor
 
+object AppContext {
+    var context: android.content.Context? = null
+}
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        AppContext.context = applicationContext
 
         val db = com.gaitvision.data.getAppDatabase(applicationContext)
 

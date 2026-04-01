@@ -12,6 +12,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
@@ -23,7 +24,8 @@ fun SettingsScreen(
     onNavigateToCsv: () -> Unit
 ) {
     var notificationEnabled by remember { mutableStateOf(true) }
-    var darkThemeEnabled by remember { mutableStateOf(false) }
+    val systemDark = isSystemInDarkTheme()
+    var darkThemeEnabled by remember { mutableStateOf(ThemeConfig.isDarkMode ?: systemDark) }
 
     Scaffold(
         topBar = {
@@ -67,6 +69,7 @@ fun SettingsScreen(
             item {
                 SettingSwitchRow(title = "Dark Theme", checked = darkThemeEnabled) {
                     darkThemeEnabled = it
+                    ThemeConfig.isDarkMode = it
                 }
             }
             

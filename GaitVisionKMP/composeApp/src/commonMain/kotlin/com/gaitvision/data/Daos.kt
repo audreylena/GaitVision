@@ -109,4 +109,10 @@ interface GaitScoreDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertScore(score: GaitScoreEntity): Long
+
+    @Query("SELECT * FROM gait_scores WHERE patientId = :patientId ORDER BY recordedAt DESC LIMIT 1")
+    suspend fun getLatestScoreForPatient(patientId: Long): GaitScoreEntity?
+
+    @Query("SELECT * FROM gait_scores ORDER BY recordedAt DESC")
+    fun getAllScoresFlow(): Flow<List<GaitScoreEntity>>
 }

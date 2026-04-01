@@ -11,6 +11,13 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+
+object ThemeConfig {
+    var isDarkMode by mutableStateOf<Boolean?>(null)
+}
 
 // Color Palette
 // Clinical Color Palette
@@ -52,26 +59,22 @@ val AppTypography = Typography(
     h1 = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Bold,
-        fontSize = 32.sp,
-        color = TextPrimary
+        fontSize = 32.sp
     ),
     h4 = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.SemiBold,
-        fontSize = 24.sp,
-        color = TextPrimary
+        fontSize = 24.sp
     ),
     h6 = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Medium,
-        fontSize = 18.sp,
-        color = TextPrimary
+        fontSize = 18.sp
     ),
     body1 = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Normal,
-        fontSize = 16.sp,
-        color = TextSecondary
+        fontSize = 16.sp
     ),
     button = TextStyle(
         fontFamily = FontFamily.SansSerif,
@@ -83,7 +86,7 @@ val AppTypography = Typography(
 
 @Composable
 fun GaitVisionTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    darkTheme: Boolean = ThemeConfig.isDarkMode ?: isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {
     val colors = if (darkTheme) {

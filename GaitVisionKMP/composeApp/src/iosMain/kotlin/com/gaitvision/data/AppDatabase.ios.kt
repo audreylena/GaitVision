@@ -1,7 +1,15 @@
 package com.gaitvision.data
 
-/**
- * iOS stub for AppDatabase. Since all DAO methods are not yet implemented
- * on iOS, this is a no-op placeholder that satisfies the expect/actual contract.
- */
-actual class AppDatabase
+import androidx.room.Room
+import androidx.sqlite.driver.bundled.BundledSQLiteDriver
+import platform.Foundation.NSHomeDirectory
+
+fun getAppDatabase(): AppDatabase {
+    val dbFilePath = NSHomeDirectory() + "/gaitvision.db"
+    return Room.databaseBuilder<AppDatabase>(
+        name = dbFilePath,
+        factory =  { AppDatabase::class.instantiateImpl() }
+    )
+        .setDriver(BundledSQLiteDriver())
+        .build()
+}

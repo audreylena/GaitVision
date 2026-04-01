@@ -13,10 +13,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val db = Room.databaseBuilder<AppDatabase>(
-            context = applicationContext,
-            name = "gaitvision.db"
-        ).setDriver(BundledSQLiteDriver()).build()
+        val db = com.gaitvision.data.getAppDatabase(applicationContext)
 
         val poseDetector = AndroidPoseDetector()
         val videoProcessor = AndroidVideoProcessor(applicationContext)

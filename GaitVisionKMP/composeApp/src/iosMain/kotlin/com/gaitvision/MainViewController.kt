@@ -9,6 +9,6 @@ fun MainViewController() = ComposeUIViewController {
     App(
         poseDetector = IOSPoseDetector(),
         videoProcessor = IOSVideoProcessor(),
-        database = AppDatabase()
+        database = getAppDatabase()
     )
 }

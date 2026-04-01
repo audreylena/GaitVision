@@ -73,6 +73,7 @@ fun AppNavigation(
         
         composable(Screen.PatientList) {
             PatientListScreen(
+                database = database,
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToCreatePatient = { navController.navigate(Screen.PatientCreate) },
                 onNavigateToPatientProfile = { patientId -> 
@@ -83,6 +84,7 @@ fun AppNavigation(
         
         composable(Screen.PatientCreate) {
             PatientCreateScreen(
+                database = database,
                 onNavigateBack = { navController.popBackStack() },
                 onPatientCreated = { navController.popBackStack() }
             )
@@ -95,6 +97,7 @@ fun AppNavigation(
             val patientId = backStackEntry.arguments?.getLong("patientId") ?: 0L
             PatientProfileScreen(
                 patientId = patientId,
+                database = database,
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToResults = { scoreId -> 
                     navController.navigate(Screen.createResultsRoute(scoreId))
@@ -109,6 +112,7 @@ fun AppNavigation(
             val scoreId = backStackEntry.arguments?.getLong("scoreId") ?: 0L
             ResultsScreen(
                 scoreId = scoreId,
+                database = database,
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToSignals = { sId ->
                     navController.navigate(Screen.createSignalsDashboardRoute(sId))

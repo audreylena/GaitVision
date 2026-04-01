@@ -14,16 +14,28 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.gaitvision.data.Patient
+import androidx.compose.runtime.*
+import com.gaitvision.data.PatientEntity
 
 @Composable
 fun PatientProfileScreen(
     patientId: Long,
+    database: com.gaitvision.data.AppDatabase,
     onNavigateBack: () -> Unit,
     onNavigateToResults: (Long) -> Unit
 ) {
-    // Mock the patient data for UI
-    val patient = Patient(id = patientId, firstName = "Alex", lastName = "Taylor", age = 29, height = 71)
+    var patient by remember { mutableStateOf<PatientEntity?>(null) }
+    
+    LaunchedEffect(patientId) {
+        patient = database.patientDao().getPatientById(patientId)
+    }
+
+    if (patient == null) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+        return
+    }
 
     Scaffold(
         topBar = {
@@ -62,12 +74,12 @@ fun PatientProfileScreen(
             }
             Spacer(modifier = Modifier.height(16.dp))
             Text(
-                text = patient.fullName,
+                text = "${patient?.firstName} ${patient?.lastName}",
                 style = MaterialTheme.typography.h5,
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "Age: ${patient.age ?: "Unknown"} | Height: ${patient.height}\"",
+                text = "Age: ${patient?.age ?: "Unknown"} | Height: ${patient?.height}\"",
                 style = MaterialTheme.typography.body1,
                 color = Color.Gray
             )

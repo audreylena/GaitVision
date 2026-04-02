@@ -136,7 +136,7 @@ fun AnalysisScreen(
                     
                     drawPath(
                         path = path,
-                        color = MedicalBlue,
+                        color = PrimaryBlue,
                         style = Stroke(width = 4f)
                     )
                 }

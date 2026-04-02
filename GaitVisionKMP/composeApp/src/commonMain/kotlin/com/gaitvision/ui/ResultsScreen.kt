@@ -1,20 +1,24 @@
 package com.gaitvision.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.runtime.Composable
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.runtime.*
+import androidx.compose.ui.unit.sp
 import com.gaitvision.data.AppDatabase
 import com.gaitvision.data.GaitScoreEntity
 
@@ -23,7 +27,9 @@ fun ResultsScreen(
     scoreId: Long,
     database: AppDatabase,
     onNavigateBack: () -> Unit,
-    onNavigateToSignals: (Long) -> Unit
+    onNavigateToSignals: (Long) -> Unit,
+    onNavigateToFeatures: () -> Unit = {},
+    onNavigateToCsv: () -> Unit = {}
 ) {
     var scoreEntity by remember { mutableStateOf<GaitScoreEntity?>(null) }
     LaunchedEffect(scoreId) {
@@ -33,22 +39,30 @@ fun ResultsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Gait Analysis Results") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                title = {
+                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        Text(
+                            "Analysis Results",
+                            style = MaterialTheme.typography.h5.copy(fontWeight = FontWeight.Bold),
+                            color = Color.White
+                        )
                     }
                 },
-                backgroundColor = MaterialTheme.colors.primary,
-                contentColor = MaterialTheme.colors.onPrimary,
-                elevation = 4.dp
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
+                    }
+                },
+                backgroundColor = Color.Transparent,
+                elevation = 0.dp,
+                actions = { Spacer(modifier = Modifier.width(48.dp)) }
             )
         },
-        backgroundColor = MaterialTheme.colors.background
+        backgroundColor = BgUltraDarkBlue
     ) { paddingValues ->
         if (scoreEntity == null) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
+                CircularProgressIndicator(color = PrimaryBlue)
             }
             return@Scaffold
         }
@@ -64,187 +78,129 @@ fun ResultsScreen(
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Overall Score Circle
-            Surface(
-                modifier = Modifier.size(140.dp),
-                shape = RoundedCornerShape(70.dp),
-                color = scoreToBackgroundColor(overall),
-                elevation = 8.dp
+            // Main Score Card
+            Card(
+                modifier = Modifier.fillMaxWidth().height(220.dp),
+                shape = RoundedCornerShape(16.dp),
+                backgroundColor = CardSurfaceDark,
+                elevation = 0.dp
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = "$overall",
-                            style = MaterialTheme.typography.h2,
-                            color = scoreToTextColor(overall),
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text("/ 100", style = MaterialTheme.typography.body2, color = Color.Gray)
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = when {
-                    overall >= 85 -> "Excellent Gait"
-                    overall >= 70 -> "Good Gait"
-                    overall >= 50 -> "Moderate Impairment"
-                    else -> "Significant Impairment"
-                },
-                style = MaterialTheme.typography.h6,
-                color = scoreToTextColor(overall),
-                fontWeight = FontWeight.SemiBold
-            )
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Score Breakdown Card
-            Card(elevation = 4.dp, shape = RoundedCornerShape(12.dp)) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
                     Text(
-                        "Score Breakdown",
-                        style = MaterialTheme.typography.h6,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(bottom = 12.dp)
+                        "GAIT SCORE",
+                        style = MaterialTheme.typography.caption.copy(letterSpacing = 2.sp),
+                        color = TextSlate
                     )
-                    ResultRow(
-                        title = "Overall Gait Score",
-                        value = "$overall",
-                        subtitle = "Autoencoder Model (Primary)",
-                        score = overall
-                    )
-                    Divider(color = Color.LightGray.copy(alpha = 0.5f), modifier = Modifier.padding(vertical = 8.dp))
-                    ResultRow(
-                        title = "Left Knee ROM",
-                        value = score.leftKneeScore?.let { "${it.toInt()}°" } ?: "N/A",
-                        subtitle = "Range of Motion",
-                        score = score.leftKneeScore?.toInt() ?: -1
-                    )
-                    ResultRow(
-                        title = "Right Knee ROM",
-                        value = score.rightKneeScore?.let { "${it.toInt()}°" } ?: "N/A",
-                        subtitle = "Range of Motion",
-                        score = score.rightKneeScore?.toInt() ?: -1
-                    )
-                    ResultRow(
-                        title = "Hip Smoothness",
-                        value = score.leftHipScore?.let { "${it.toInt()}" } ?: "N/A",
-                        subtitle = "Log Dimensionless Jerk",
-                        score = score.leftHipScore?.let { 
-                            // LDJ: more negative = smoother; map to 0-100
-                            val ldj = it.toFloat()
-                            if (ldj.isNaN()) -1 else ((-ldj / 15f) * 100).toInt().coerceIn(0, 100)
-                        } ?: -1
-                    )
-                    ResultRow(
-                        title = "Ridge Prediction",
-                        value = score.rightHipScore?.let { "${it.toInt()}" } ?: "N/A",
-                        subtitle = "Severity Regression Model",
-                        score = score.rightHipScore?.toInt() ?: -1
-                    )
-                    ResultRow(
-                        title = "Trunk Lean Stability",
-                        value = score.torsoScore?.let { "${(it * 10).toLong().toFloat() / 10f}°" } ?: "N/A",
-                        subtitle = "Std. deviation (lower = better)",
-                        score = score.torsoScore?.let {
-                            val std = it.toFloat()
-                            if (std.isNaN()) -1 else ((1f - std / 15f) * 100).toInt().coerceIn(0, 100)
-                        } ?: -1
+                    Spacer(modifier = Modifier.height(32.dp))
+                    
+                    // Simple Score Bar / Segment mockup
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Box(modifier = Modifier.size(width = 40.dp, height = 8.dp).background(ButtonDanger, RoundedCornerShape(4.dp)))
+                        Box(modifier = Modifier.size(width = 40.dp, height = 8.dp).background(ButtonDanger, RoundedCornerShape(4.dp)))
+                    }
+                    
+                    Spacer(modifier = Modifier.height(32.dp))
+                    Text(
+                        "Feature extraction not run",
+                        style = MaterialTheme.typography.body1,
+                        color = Color.White
                     )
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Interpretation Card
+            // Model Scores Section
             Card(
-                elevation = 2.dp,
-                shape = RoundedCornerShape(12.dp),
-                backgroundColor = MaterialTheme.colors.surface
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                backgroundColor = CardSurfaceDark,
+                elevation = 0.dp
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        "Clinical Interpretation",
-                        style = MaterialTheme.typography.subtitle1,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = when {
-                            overall >= 85 -> "Gait pattern is within normal parameters. No significant asymmetry or temporal irregularity detected."
-                            overall >= 70 -> "Mild gait deviations noted. Monitor for progression and consider targeted rehabilitation."
-                            overall >= 50 -> "Moderate gait impairment. Clinical follow-up recommended. Physical therapy may be beneficial."
-                            else -> "Significant gait impairment detected. Immediate clinical evaluation recommended."
-                        },
+                        "Model Scores",
                         style = MaterialTheme.typography.body2,
-                        color = MaterialTheme.colors.onSurface.copy(alpha = 0.8f)
+                        color = TextSlate,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+                    
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        ScoreMetricItem("Autoencoder", "--", PrimaryPurple)
+                        ScoreMetricItem("Ridge", "--", PrimaryBlue)
+                        ScoreMetricItem("PCA", "--", AccentGreen)
+                    }
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        "100 = Healthy, 0 = Impaired",
+                        style = MaterialTheme.typography.caption,
+                        color = TextSlate,
+                        modifier = Modifier.align(Alignment.CenterHorizontally)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            // Action Buttons
-            Button(
-                onClick = { onNavigateToSignals(scoreId) },
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(backgroundColor = MaterialTheme.colors.secondary)
+            // Action List
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                backgroundColor = CardSurfaceDark,
+                elevation = 0.dp
             ) {
-                Text("View Signals Dashboard", color = Color.White, fontWeight = FontWeight.SemiBold)
+                Column {
+                    ResultActionRow(
+                        title = "View Gait Features",
+                        icon = Icons.Default.List,
+                        onClick = onNavigateToFeatures
+                    )
+                    Divider(color = BgUltraDarkBlue, thickness = 1.dp)
+                    ResultActionRow(
+                        title = "View Signal Dashboard",
+                        icon = Icons.Default.Search,
+                        onClick = { onNavigateToSignals(scoreId) }
+                    )
+                    Divider(color = BgUltraDarkBlue, thickness = 1.dp)
+                    ResultActionRow(
+                        title = "Export CSV Files",
+                        icon = Icons.Default.Share,
+                        onClick = onNavigateToCsv
+                    )
+                }
             }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            OutlinedButton(
-                onClick = onNavigateBack,
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text("Done")
-            }
+            
+            Spacer(modifier = Modifier.height(32.dp))
         }
     }
 }
 
 @Composable
-fun ResultRow(title: String, value: String, subtitle: String = "", score: Int = -1) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.body1, fontWeight = FontWeight.Medium)
-            if (subtitle.isNotEmpty()) {
-                Text(subtitle, style = MaterialTheme.typography.caption, color = Color.Gray)
-            }
-        }
-        Text(
-            text = value,
-            style = MaterialTheme.typography.subtitle1,
-            fontWeight = FontWeight.Bold,
-            color = when {
-                score < 0 -> MaterialTheme.colors.onSurface
-                score >= 80 -> Color(0xFF137333)
-                score >= 50 -> Color(0xFFE37400)
-                else -> Color(0xFFC5221F)
-            }
-        )
+fun ScoreMetricItem(label: String, value: String, color: Color) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(label, style = MaterialTheme.typography.caption, color = color)
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(value, style = MaterialTheme.typography.h5.copy(fontWeight = FontWeight.Bold), color = Color.White)
     }
 }
 
-private fun scoreToBackgroundColor(score: Int): Color = when {
-    score >= 85 -> Color(0xFFE6F4EA)
-    score >= 70 -> Color(0xFFFEF3CD)
-    score >= 50 -> Color(0xFFFCE8E6)
-    else -> Color(0xFFFFE0E0)
-}
-
-private fun scoreToTextColor(score: Int): Color = when {
-    score >= 85 -> Color(0xFF137333)
-    score >= 70 -> Color(0xFFE37400)
-    score >= 50 -> Color(0xFFC5221F)
-    else -> Color(0xFF9B0000)
+@Composable
+fun ResultActionRow(title: String, icon: ImageVector, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(24.dp))
+        Spacer(modifier = Modifier.width(16.dp))
+        Text(title, style = MaterialTheme.typography.subtitle1.copy(fontWeight = FontWeight.Bold), color = Color.White, modifier = Modifier.weight(1f))
+        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = TextSlate)
+    }
 }

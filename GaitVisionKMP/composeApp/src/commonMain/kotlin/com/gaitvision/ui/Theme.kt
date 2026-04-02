@@ -19,40 +19,42 @@ object ThemeConfig {
     var isDarkMode by mutableStateOf<Boolean?>(null)
 }
 
-// Color Palette
-// Clinical Color Palette
-val MedicalBlue = Color(0xFF0052CC) // Deep trustworthy blue
-val MedicalBlueVariant = Color(0xFF003D99)
-val TealAccent = Color(0xFF00B8D4) // Modern, clean accent
-val CleanWhite = Color(0xFFFFFFFF)
-val LightGrayBackground = Color(0xFFF5F7FA) // Soft clinical background
-val TextPrimary = Color(0xFF172B4D) // Dark blue-gray for readability
-val TextSecondary = Color(0xFF5E6C84)
+// App Colors from original Android app design
+val BgUltraDarkBlue = Color(0xFF1A1A2E)
+val BgDarkBlue = Color(0xFF16213E)
+val CardSurfaceDark = Color(0xFF252542)
+val TextLight = Color(0xFFFFFFFF)
+val TextLightMuted = Color(0xFFE2E8F0)
+val TextSlate = Color(0xFF94A3B8)
 
-private val LightColorPalette = lightColors(
-    primary = MedicalBlue,
-    primaryVariant = MedicalBlueVariant,
-    secondary = TealAccent,
-    background = LightGrayBackground,
-    surface = CleanWhite,
-    onPrimary = CleanWhite,
-    onSecondary = CleanWhite,
-    onBackground = TextPrimary,
-    onSurface = TextPrimary
+val PrimaryBlue = Color(0xFF3B82F6)
+val PrimaryPurple = Color(0xFF8B5CF6)
+val SecondaryTeal = Color(0xFF0891B2)
+val AccentGreen = Color(0xFF10B981)
+val ButtonDanger = Color(0xFFF43F5E)
+
+private val DarkColorPalette = darkColors(
+    primary = PrimaryBlue,
+    primaryVariant = PrimaryPurple,
+    secondary = AccentGreen,
+    background = BgUltraDarkBlue,
+    surface = CardSurfaceDark,
+    onPrimary = TextLight,
+    onSecondary = TextLight,
+    onBackground = TextLight,
+    onSurface = TextLight
 )
 
-// We focus on Light Theme for clinical apps as it feels cleaner/sterile, 
-// but Dark Theme can be mapped similarly if needed.
-private val DarkColorPalette = darkColors(
-    primary = MedicalBlue,
-    primaryVariant = MedicalBlueVariant,
-    secondary = TealAccent,
-    background = Color(0xFF121212),
-    surface = Color(0xFF1E1E1E),
-    onPrimary = CleanWhite,
-    onSecondary = Color.Black,
-    onBackground = CleanWhite,
-    onSurface = CleanWhite
+private val LightColorPalette = lightColors(
+    primary = PrimaryBlue,
+    primaryVariant = PrimaryPurple,
+    secondary = AccentGreen,
+    background = Color(0xFFF1F5F9),
+    surface = Color.White,
+    onPrimary = Color.White,
+    onSecondary = Color.White,
+    onBackground = Color(0xFF0F172A),
+    onSurface = Color(0xFF1E293B)
 )
 
 val AppTypography = Typography(
@@ -66,6 +68,11 @@ val AppTypography = Typography(
         fontWeight = FontWeight.SemiBold,
         fontSize = 24.sp
     ),
+    h5 = TextStyle(
+        fontFamily = FontFamily.SansSerif,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 20.sp
+    ),
     h6 = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Medium,
@@ -76,17 +83,29 @@ val AppTypography = Typography(
         fontWeight = FontWeight.Normal,
         fontSize = 16.sp
     ),
+    body2 = TextStyle(
+        fontFamily = FontFamily.SansSerif,
+        fontWeight = FontWeight.Normal,
+        fontSize = 14.sp
+    ),
     button = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Bold,
         fontSize = 14.sp,
         letterSpacing = 1.sp
+    ),
+    caption = TextStyle(
+        fontFamily = FontFamily.SansSerif,
+        fontWeight = FontWeight.Normal,
+        fontSize = 12.sp
     )
 )
 
 @Composable
 fun GaitVisionTheme(
-    darkTheme: Boolean = ThemeConfig.isDarkMode ?: isSystemInDarkTheme(),
+    // We enforce dark theme by default based on screenshots, 
+    // unless explicitly changed.
+    darkTheme: Boolean = ThemeConfig.isDarkMode ?: true,
     content: @Composable () -> Unit
 ) {
     val colors = if (darkTheme) {

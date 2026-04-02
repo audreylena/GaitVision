@@ -57,7 +57,10 @@ fun AppNavigation(
                     navController.navigate(Screen.createResultsRoute(scoreId))
                 },
                 database = database,
-                videoProcessor = videoProcessor
+                videoProcessor = videoProcessor,
+                onNavigateToHelp = { navController.navigate(Screen.Help) },
+                onNavigateToInfo = { navController.navigate(Screen.Info) },
+                onNavigateToCreatePatient = { navController.navigate(Screen.PatientCreate) }
             )
         }
 
@@ -100,7 +103,10 @@ fun AppNavigation(
             PatientCreateScreen(
                 database = database,
                 onNavigateBack = { navController.popBackStack() },
-                onPatientCreated = { navController.popBackStack() }
+                onPatientCreated = { navController.popBackStack() },
+                onNavigateToCamera = { patientId ->
+                    navController.navigate(Screen.createCameraRoute(patientId))
+                }
             )
         }
 

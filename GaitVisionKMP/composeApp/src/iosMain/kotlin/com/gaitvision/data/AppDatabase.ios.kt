@@ -8,7 +8,7 @@ fun getAppDatabase(): AppDatabase {
     val dbFilePath = NSHomeDirectory() + "/gaitvision.db"
     return Room.databaseBuilder<AppDatabase>(
         name = dbFilePath,
-        factory =  { AppDatabase::class.instantiateImpl() }
+        factory =  { AppDatabaseConstructor.initialize() }
     )
         .setDriver(BundledSQLiteDriver())
         .build()

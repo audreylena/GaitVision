@@ -33,7 +33,7 @@ fun ResultsScreen(
     onNavigateBack: () -> Unit,
     onNavigateToSignals: (Long) -> Unit,
     onNavigateToFeatures: () -> Unit = {},
-    onNavigateToCsv: () -> Unit = {}
+    onNavigateToCsv: (Long) -> Unit
 ) {
     var scoreEntity by remember { mutableStateOf<GaitScoreEntity?>(null) }
     var reviewEntity by remember { mutableStateOf<ClinicianReviewEntity?>(null) }
@@ -278,7 +278,7 @@ fun ResultsScreen(
                     ResultActionRow(
                         title = "Export CSV Files",
                         icon = Icons.Default.Share,
-                        onClick = onNavigateToCsv
+                        onClick = { onNavigateToCsv(scoreId) }
                     )
                 }
             }

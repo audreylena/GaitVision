@@ -1,6 +1,7 @@
 package com.gaitvision.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -10,7 +11,6 @@ import androidx.navigation.navArgument
 import com.gaitvision.data.AppDatabase
 import com.gaitvision.platform.PoseDetector
 import com.gaitvision.platform.VideoProcessor
-import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 
 object Screen {
@@ -26,13 +26,14 @@ object Screen {
     const val Settings = "settings"
     const val Help = "help"
     const val Info = "info"
-    const val Csv = "csv"
+    const val Csv = "csv/{scoreId}"
 
     fun createAiDisclosureRoute(patientId: Long) = "ai_disclosure/$patientId"
     fun createCameraRoute(patientId: Long) = "camera/$patientId"
     fun createPatientProfileRoute(patientId: Long) = "patient_profile/$patientId"
     fun createResultsRoute(scoreId: Long) = "results/$scoreId"
     fun createSignalsDashboardRoute(scoreId: Long) = "signals_dashboard/$scoreId"
+    fun createCsvRoute(scoreId: Long) = "csv/$scoreId"
 }
 
 @Composable
@@ -87,7 +88,7 @@ fun AppNavigation(
             AiDisclosureScreen(
                 patientId = patientId,
                 database = database,
-                onConsentGranted = { 
+                onConsentGranted = {
                     navController.popBackStack()
                     navController.navigate(Screen.createCameraRoute(patientId))
                 },
@@ -166,6 +167,9 @@ fun AppNavigation(
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToSignals = { sId ->
                     navController.navigate(Screen.createSignalsDashboardRoute(sId))
+                },
+                onNavigateToCsv = { sId ->
+                    navController.navigate(Screen.createCsvRoute(sId))
                 }
             )
         }
@@ -186,7 +190,7 @@ fun AppNavigation(
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToHelp = { navController.navigate(Screen.Help) },
                 onNavigateToInfo = { navController.navigate(Screen.Info) },
-                onNavigateToCsv = { navController.navigate(Screen.Csv) }
+                onNavigateToCsv = { }
             )
         }
 
@@ -202,8 +206,13 @@ fun AppNavigation(
             )
         }
 
-        composable(Screen.Csv) {
+        composable(
+            route = Screen.Csv,
+            arguments = listOf(navArgument("scoreId") { type = NavType.LongType })
+        ) { backStackEntry ->
+            val scoreId = backStackEntry.arguments?.getLong("scoreId") ?: 0L
             CsvScreen(
+                scoreId = scoreId,
                 database = database,
                 onNavigateBack = { navController.popBackStack() }
             )

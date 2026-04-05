@@ -43,7 +43,12 @@ object GaitCsvExporter {
         diagnostics: GaitDiagnostics,
         score: ScoringResult?,
         participantId: String,
-        videoName: String
+        videoName: String,
+        biologicalSex: String,
+        isReviewed: Boolean,
+        reviewTimestamp: Long?,
+        aiConsentGiven: Boolean,
+        consentTimestamp: Long?
     ): String {
         return try {
             val timestamp = getCurrentTimestampString()
@@ -64,7 +69,12 @@ object GaitCsvExporter {
                 "num_frames_valid",
                 "valid_frame_rate",
                 "num_steps_detected",
-                "num_strides_valid"
+                "num_strides_valid",
+                "biological_sex",
+                "clinician_reviewed",
+                "review_timestamp",
+                "ai_consent_given",
+                "consent_timestamp"
             )
             
             // Add feature columns
@@ -97,6 +107,11 @@ object GaitCsvExporter {
             values.add(diagnostics.validFrameRate.toString())
             values.add(diagnostics.numStepsDetected.toString())
             values.add(diagnostics.numStridesValid.toString())
+            values.add(sanitize(biologicalSex))
+            values.add(isReviewed.toString())
+            values.add(reviewTimestamp?.toString() ?: "")
+            values.add(aiConsentGiven.toString())
+            values.add(consentTimestamp?.toString() ?: "")
             
             // Features (or NaN if not available)
             if (features != null) {

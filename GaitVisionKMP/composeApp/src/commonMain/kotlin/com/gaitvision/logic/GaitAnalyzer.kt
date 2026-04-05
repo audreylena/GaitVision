@@ -51,7 +51,7 @@ class GaitAnalyzer {
      * @param patientId Patient to associate the score with.
      * @param videoId   Video entity ID (0 if unknown/live camera).
      */
-    fun analyze(patientId: Long = 0L, videoId: Long = 0L): GaitScoreEntity {
+    fun analyze(patientId: Long = 0L, videoId: Long = 0L, biologicalSex: String = ""): GaitScoreEntity {
         // Lazily initialize scorer
         if (!scorerInitialized) {
             scorerInitialized = scorer.initialize()
@@ -90,6 +90,7 @@ class GaitAnalyzer {
         return GaitScoreEntity(
             patientId = patientId,
             videoId = videoId,
+            biologicalSex = biologicalSex,
             overallScore = overallScore,
             recordedAt = Clock.System.now().toEpochMilliseconds(),
             leftKneeScore = features.knee_left_rom.toDoubleOrNull(),

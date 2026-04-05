@@ -10,9 +10,12 @@ import androidx.navigation.navArgument
 import com.gaitvision.data.AppDatabase
 import com.gaitvision.platform.PoseDetector
 import com.gaitvision.platform.VideoProcessor
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 
 object Screen {
     const val Dashboard = "dashboard"
+    const val AiDisclosure = "ai_disclosure/{patientId}"
     const val Camera = "camera/{patientId}"
     const val Analysis = "analysis"
     const val PatientList = "patient_list"
@@ -25,6 +28,7 @@ object Screen {
     const val Info = "info"
     const val Csv = "csv"
 
+    fun createAiDisclosureRoute(patientId: Long) = "ai_disclosure/$patientId"
     fun createCameraRoute(patientId: Long) = "camera/$patientId"
     fun createPatientProfileRoute(patientId: Long) = "patient_profile/$patientId"
     fun createResultsRoute(scoreId: Long) = "results/$scoreId"
@@ -38,15 +42,26 @@ fun AppNavigation(
     database: AppDatabase,
     navController: NavHostController = rememberNavController()
 ) {
+    val scope = rememberCoroutineScope()
+
+    val navigateToCameraOrConsent: (Long) -> Unit = { patientId ->
+        scope.launch {
+            val consent = database.aiConsentDao().getConsentForPatient(patientId)
+            if (consent != null && consent.consentGiven) {
+                navController.navigate(Screen.createCameraRoute(patientId))
+            } else {
+                navController.navigate(Screen.createAiDisclosureRoute(patientId))
+            }
+        }
+    }
+
     NavHost(
         navController = navController,
         startDestination = Screen.Dashboard
     ) {
         composable(Screen.Dashboard) {
             DashboardScreen(
-                onNavigateToCamera = { patientId ->
-                    navController.navigate(Screen.createCameraRoute(patientId))
-                },
+                onNavigateToCamera = { patientId -> navigateToCameraOrConsent(patientId) },
                 onNavigateToAnalysis = { navController.navigate(Screen.Analysis) },
                 onNavigateToPatientList = { navController.navigate(Screen.PatientList) },
                 onNavigateToSettings = { navController.navigate(Screen.Settings) },
@@ -61,6 +76,22 @@ fun AppNavigation(
                 onNavigateToHelp = { navController.navigate(Screen.Help) },
                 onNavigateToInfo = { navController.navigate(Screen.Info) },
                 onNavigateToCreatePatient = { navController.navigate(Screen.PatientCreate) }
+            )
+        }
+
+        composable(
+            route = Screen.AiDisclosure,
+            arguments = listOf(navArgument("patientId") { type = NavType.LongType })
+        ) { backStackEntry ->
+            val patientId = backStackEntry.arguments?.getLong("patientId") ?: 0L
+            AiDisclosureScreen(
+                patientId = patientId,
+                database = database,
+                onConsentGranted = { 
+                    navController.popBackStack()
+                    navController.navigate(Screen.createCameraRoute(patientId))
+                },
+                onDecline = { navController.popBackStack() }
             )
         }
 
@@ -104,9 +135,7 @@ fun AppNavigation(
                 database = database,
                 onNavigateBack = { navController.popBackStack() },
                 onPatientCreated = { navController.popBackStack() },
-                onNavigateToCamera = { patientId ->
-                    navController.navigate(Screen.createCameraRoute(patientId))
-                }
+                onNavigateToCamera = { patientId -> navigateToCameraOrConsent(patientId) }
             )
         }
 
@@ -122,9 +151,7 @@ fun AppNavigation(
                 onNavigateToResults = { scoreId ->
                     navController.navigate(Screen.createResultsRoute(scoreId))
                 },
-                onNavigateToCamera = {
-                    navController.navigate(Screen.createCameraRoute(patientId))
-                }
+                onNavigateToCamera = { navigateToCameraOrConsent(patientId) }
             )
         }
 
@@ -177,6 +204,7 @@ fun AppNavigation(
 
         composable(Screen.Csv) {
             CsvScreen(
+                database = database,
                 onNavigateBack = { navController.popBackStack() }
             )
         }

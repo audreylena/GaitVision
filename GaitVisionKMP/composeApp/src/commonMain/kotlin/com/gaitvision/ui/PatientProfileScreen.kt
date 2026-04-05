@@ -18,8 +18,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.*
 import com.gaitvision.data.AppDatabase
+import com.gaitvision.data.AuditLogger
+import com.gaitvision.data.ClinicianReviewEntity
 import com.gaitvision.data.GaitScoreEntity
 import com.gaitvision.data.PatientEntity
+import kotlinx.coroutines.launch
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -33,11 +36,12 @@ fun PatientProfileScreen(
     onNavigateToCamera: () -> Unit = {}
 ) {
     var patient by remember { mutableStateOf<PatientEntity?>(null) }
-    val scores by database.gaitScoreDao().getScoresForPatientFlow(patientId)
+    val scoresWithReviews by database.gaitScoreDao().getScoresWithReviewsForPatientFlow(patientId)
         .collectAsState(initial = emptyList())
 
     LaunchedEffect(patientId) {
         patient = database.patientDao().getPatientById(patientId)
+        AuditLogger.log(database.auditLogDao(), "VIEW_PATIENT", patientId = patientId)
     }
 
     if (patient == null) {
@@ -121,11 +125,11 @@ fun PatientProfileScreen(
                             }
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(
-                                    text = patient?.gender ?: "—",
+                                    text = patient?.biologicalSex.takeIf { !it.isNullOrBlank() } ?: "—",
                                     style = MaterialTheme.typography.h6,
                                     fontWeight = FontWeight.Bold
                                 )
-                                Text("Gender", style = MaterialTheme.typography.caption, color = Color.Gray)
+                                Text("Biological Sex", style = MaterialTheme.typography.caption, color = Color.Gray)
                             }
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(
@@ -141,9 +145,9 @@ fun PatientProfileScreen(
             }
 
             // Latest Score Summary
-            if (scores.isNotEmpty()) {
+            if (scoresWithReviews.isNotEmpty()) {
                 item {
-                    val latestScore = scores.last()
+                    val latestScore = scoresWithReviews.last().score
                     val scoreVal = latestScore.overallScore.toInt()
                     Card(
                         elevation = 4.dp,
@@ -182,7 +186,7 @@ fun PatientProfileScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Assessments (${scores.size})", style = MaterialTheme.typography.h6)
+                    Text("Assessments (${scoresWithReviews.size})", style = MaterialTheme.typography.h6)
                     TextButton(onClick = onNavigateToCamera) {
                         Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
@@ -191,7 +195,7 @@ fun PatientProfileScreen(
                 }
             }
 
-            if (scores.isEmpty()) {
+            if (scoresWithReviews.isEmpty()) {
                 item {
                     Card(elevation = 2.dp, shape = RoundedCornerShape(8.dp)) {
                         Box(
@@ -210,10 +214,11 @@ fun PatientProfileScreen(
                     }
                 }
             } else {
-                items(scores.reversed()) { score ->
+                items(scoresWithReviews.reversed()) { item ->
                     AssessmentCard(
-                        score = score,
-                        onClick = { onNavigateToResults(score.id) }
+                        score = item.score,
+                        isReviewed = item.review?.isReviewed == true,
+                        onClick = { onNavigateToResults(item.score.id) }
                     )
                 }
             }
@@ -222,7 +227,7 @@ fun PatientProfileScreen(
 }
 
 @Composable
-private fun AssessmentCard(score: GaitScoreEntity, onClick: () -> Unit) {
+private fun AssessmentCard(score: GaitScoreEntity, isReviewed: Boolean = false, onClick: () -> Unit) {
     val overall = score.overallScore.toInt()
     val dateStr = try {
         val instant = Instant.fromEpochMilliseconds(score.recordedAt)
@@ -242,9 +247,21 @@ private fun AssessmentCard(score: GaitScoreEntity, onClick: () -> Unit) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text("Gait Analysis", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.subtitle1)
                 Text(dateStr, style = MaterialTheme.typography.caption, color = Color.Gray)
+                Spacer(modifier = Modifier.height(4.dp))
+                Surface(
+                    color = if (isReviewed) Color(0xFFE6F4EA) else Color(0xFFFFF3E0),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = if (isReviewed) "✓ Reviewed" else "⏳ Pending Review",
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                        style = MaterialTheme.typography.caption,
+                        color = if (isReviewed) Color(0xFF137333) else Color(0xFFE65100)
+                    )
+                }
             }
             Surface(
                 color = if (overall > 80) Color(0xFFE6F4EA) else Color(0xFFFCE8E6),

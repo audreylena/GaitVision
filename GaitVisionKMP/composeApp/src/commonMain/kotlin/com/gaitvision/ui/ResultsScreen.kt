@@ -20,7 +20,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gaitvision.data.AppDatabase
+import com.gaitvision.data.AuditLogger
+import com.gaitvision.data.ClinicianReviewEntity
 import com.gaitvision.data.GaitScoreEntity
+import kotlinx.coroutines.launch
+import kotlinx.datetime.toLocalDateTime
 
 @Composable
 fun ResultsScreen(
@@ -32,8 +36,12 @@ fun ResultsScreen(
     onNavigateToCsv: () -> Unit = {}
 ) {
     var scoreEntity by remember { mutableStateOf<GaitScoreEntity?>(null) }
+    var reviewEntity by remember { mutableStateOf<ClinicianReviewEntity?>(null) }
+    val scope = rememberCoroutineScope()
     LaunchedEffect(scoreId) {
         scoreEntity = database.gaitScoreDao().getScoreById(scoreId)
+        reviewEntity = database.clinicianReviewDao().getReviewForScore(scoreId)
+        AuditLogger.log(database.auditLogDao(), "VIEW_RESULTS", recordId = scoreId)
     }
 
     Scaffold(
@@ -78,6 +86,89 @@ fun ResultsScreen(
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // ── Disclaimer Banner #1 (SB 1188 § 183.005) ──
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                backgroundColor = Color(0xFFFF8F00).copy(alpha = 0.15f),
+                elevation = 0.dp,
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFF8F00))
+            ) {
+                Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("⚠️", style = MaterialTheme.typography.h6)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        "These results were generated using artificial intelligence and must be reviewed by a licensed healthcare practitioner before clinical use.",
+                        style = MaterialTheme.typography.caption,
+                        color = Color(0xFFFFCC80)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // ── Clinician Review Card (SB 1188 § 183.005(a)(3)) ──
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                backgroundColor = CardSurfaceDark,
+                elevation = 0.dp
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        "Clinician Review",
+                        style = MaterialTheme.typography.body2,
+                        color = TextSlate,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+                    val isReviewed = reviewEntity?.isReviewed == true
+                    // Status badge
+                    Surface(
+                        color = if (isReviewed) Color(0xFF1B5E20).copy(alpha = 0.3f) else Color(0xFFE65100).copy(alpha = 0.3f),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = if (isReviewed) "✓  Reviewed" else "⏳  Pending Review",
+                            color = if (isReviewed) Color(0xFF81C784) else Color(0xFFFFB74D),
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                            modifier = Modifier.padding(12.dp)
+                        )
+                    }
+                    if (!isReviewed) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(
+                            onClick = {
+                                scope.launch {
+                                    val review = ClinicianReviewEntity(
+                                        gaitScoreId = scoreId,
+                                        isReviewed = true,
+                                        reviewTimestamp = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
+                                    )
+                                    database.clinicianReviewDao().insertReview(review)
+                                    reviewEntity = review
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(backgroundColor = PrimaryBlue)
+                        ) {
+                            Text("Mark as Reviewed", color = Color.White)
+                        }
+                    } else {
+                        reviewEntity?.reviewTimestamp?.let { ts ->
+                            Spacer(modifier = Modifier.height(8.dp))
+                            val fmt = try {
+                                val inst = kotlinx.datetime.Instant.fromEpochMilliseconds(ts)
+                                val ldt = inst.toLocalDateTime(kotlinx.datetime.TimeZone.currentSystemDefault())
+                                "${ldt.month.name.take(3)} ${ldt.dayOfMonth}, ${ldt.year} ${ldt.hour.toString().padStart(2,'0')}:${ldt.minute.toString().padStart(2,'0')}"
+                            } catch (e: Exception) { "" }
+                            Text("Reviewed: $fmt", style = MaterialTheme.typography.caption, color = TextSlate)
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
             // Main Score Card
             Card(
                 modifier = Modifier.fillMaxWidth().height(220.dp),
@@ -109,6 +200,15 @@ fun ResultsScreen(
                         style = MaterialTheme.typography.body1,
                         color = Color.White
                     )
+                    // Patient biological sex metadata — SB 1188 § 183.007(a)(2)
+                    if (score.biologicalSex.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            "Patient Sex: ${score.biologicalSex}",
+                            style = MaterialTheme.typography.caption,
+                            color = TextSlate
+                        )
+                    }
                 }
             }
 
@@ -140,6 +240,14 @@ fun ResultsScreen(
                         "100 = Healthy, 0 = Impaired",
                         style = MaterialTheme.typography.caption,
                         color = TextSlate,
+                        modifier = Modifier.align(Alignment.CenterHorizontally)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    // ── Disclaimer Banner #2 ──
+                    Text(
+                        "AI-generated scores are decision-support tools and do not constitute a medical diagnosis.",
+                        style = MaterialTheme.typography.caption,
+                        color = Color(0xFFFFCC80),
                         modifier = Modifier.align(Alignment.CenterHorizontally)
                     )
                 }

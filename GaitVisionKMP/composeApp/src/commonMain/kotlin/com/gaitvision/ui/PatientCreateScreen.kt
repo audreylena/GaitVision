@@ -126,7 +126,6 @@ fun PatientCreateScreen(
                     shape = RoundedCornerShape(8.dp)
                 )
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Biological Sex *", style = MaterialTheme.typography.caption, color = TextSlate, modifier = Modifier.padding(bottom = 8.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth().height(56.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -209,7 +208,7 @@ fun PatientCreateScreen(
                 Column {
                     Row(
                         modifier = Modifier.fillMaxWidth().clickable {
-                            if (firstName.isBlank() || lastName.isBlank() || biologicalSex.isBlank()) {
+                            if (firstName.isBlank() || lastName.isBlank() || biologicalSex.isBlank() || heightFeet.isBlank() || heightInches.isBlank()) {
                                 errorMsg = "Please fill in all required fields"
                             } else {
                                 scope.launch {
@@ -237,7 +236,7 @@ fun PatientCreateScreen(
                     Divider(color = MaterialTheme.colors.background)
                     Row(
                         modifier = Modifier.fillMaxWidth().clickable { 
-                            if (firstName.isBlank() || lastName.isBlank() || biologicalSex.isBlank()) {
+                            if (firstName.isBlank() || lastName.isBlank() || biologicalSex.isBlank() || heightFeet.isBlank() || heightInches.isBlank()) {
                                 errorMsg = "Please fill in all required fields"
                             } else {
                                 scope.launch {

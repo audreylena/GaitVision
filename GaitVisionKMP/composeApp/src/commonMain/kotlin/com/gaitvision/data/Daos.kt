@@ -18,7 +18,6 @@ data class PatientEntity(
     val firstName: String = "",
     val lastName: String = "",
     val age: Int? = null,
-    /** "Male" or "Female" — required per SB 1188 § 183.007 */
     val biologicalSex: String = "",
     val height: Int = 0,
     val createdAt: Long = 0
@@ -78,17 +77,15 @@ data class GaitScoreEntity(
     val leftHipScore: Double? = null,
     val rightHipScore: Double? = null,
     val torsoScore: Double? = null,
-    /** Patient's biological sex at time of analysis — SB 1188 § 183.007(a)(2) */
     val biologicalSex: String = ""
 )
 
 // ─────────────────────────────────────────────────────────────
-// New compliance entities
+// compliance entities
 // ─────────────────────────────────────────────────────────────
 
 /**
  * Tracks patient consent to AI-assisted diagnosis.
- * Required per SB 1188 § 183.005(b).
  */
 @Entity(
     tableName = "ai_consents",
@@ -110,8 +107,6 @@ data class AiConsentEntity(
 
 /**
  * Tracks clinician review of AI-generated gait scores.
- * Required per SB 1188 § 183.005(a)(3). The [isReviewed] boolean is
- * the specific mandated field per feat-law-instructions.
  */
 @Entity(
     tableName = "clinician_reviews",
@@ -133,9 +128,7 @@ data class ClinicianReviewEntity(
 )
 
 /**
- * HIPAA audit trail entry — records every PHI access event.
- * Required per 45 CFR § 164.312(b).
- * No FK — standalone table so log entries survive patient deletion.
+ * HIPAA audit trail entry records every PHI access event.
  */
 @Entity(tableName = "audit_logs")
 data class AuditLogEntity(

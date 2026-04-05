@@ -80,6 +80,15 @@ data class GaitScoreEntity(
     val biologicalSex: String = ""
 )
 
+data class GaitScoreWithReview(
+    @Embedded val score: GaitScoreEntity,
+    @Relation(
+        parentColumn = "id",
+        entityColumn = "gaitScoreId"
+    )
+    val review: ClinicianReviewEntity?
+)
+
 // ─────────────────────────────────────────────────────────────
 // compliance entities
 // ─────────────────────────────────────────────────────────────
@@ -176,6 +185,10 @@ interface VideoDao {
 interface GaitScoreDao {
     @Query("SELECT * FROM gait_scores WHERE patientId = :patientId ORDER BY recordedAt ASC")
     fun getScoresForPatientFlow(patientId: Long): Flow<List<GaitScoreEntity>>
+
+    @Transaction
+    @Query("SELECT * FROM gait_scores WHERE patientId = :patientId ORDER BY recordedAt ASC")
+    fun getScoresWithReviewsForPatientFlow(patientId: Long): Flow<List<GaitScoreWithReview>>
 
     @Query("SELECT * FROM gait_scores WHERE id = :id")
     suspend fun getScoreById(id: Long): GaitScoreEntity?

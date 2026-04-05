@@ -36,7 +36,7 @@ fun PatientProfileScreen(
     onNavigateToCamera: () -> Unit = {}
 ) {
     var patient by remember { mutableStateOf<PatientEntity?>(null) }
-    val scores by database.gaitScoreDao().getScoresForPatientFlow(patientId)
+    val scoresWithReviews by database.gaitScoreDao().getScoresWithReviewsForPatientFlow(patientId)
         .collectAsState(initial = emptyList())
 
     LaunchedEffect(patientId) {
@@ -145,9 +145,9 @@ fun PatientProfileScreen(
             }
 
             // Latest Score Summary
-            if (scores.isNotEmpty()) {
+            if (scoresWithReviews.isNotEmpty()) {
                 item {
-                    val latestScore = scores.last()
+                    val latestScore = scoresWithReviews.last().score
                     val scoreVal = latestScore.overallScore.toInt()
                     Card(
                         elevation = 4.dp,
@@ -186,7 +186,7 @@ fun PatientProfileScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Assessments (${scores.size})", style = MaterialTheme.typography.h6)
+                    Text("Assessments (${scoresWithReviews.size})", style = MaterialTheme.typography.h6)
                     TextButton(onClick = onNavigateToCamera) {
                         Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
@@ -195,7 +195,7 @@ fun PatientProfileScreen(
                 }
             }
 
-            if (scores.isEmpty()) {
+            if (scoresWithReviews.isEmpty()) {
                 item {
                     Card(elevation = 2.dp, shape = RoundedCornerShape(8.dp)) {
                         Box(
@@ -214,16 +214,11 @@ fun PatientProfileScreen(
                     }
                 }
             } else {
-                items(scores.reversed()) { score ->
-                    val scope = rememberCoroutineScope()
-                    var review by remember { mutableStateOf<ClinicianReviewEntity?>(null) }
-                    LaunchedEffect(score.id) {
-                        review = database.clinicianReviewDao().getReviewForScore(score.id)
-                    }
+                items(scoresWithReviews.reversed()) { item ->
                     AssessmentCard(
-                        score = score,
-                        isReviewed = review?.isReviewed == true,
-                        onClick = { onNavigateToResults(score.id) }
+                        score = item.score,
+                        isReviewed = item.review?.isReviewed == true,
+                        onClick = { onNavigateToResults(item.score.id) }
                     )
                 }
             }

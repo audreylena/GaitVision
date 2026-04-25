@@ -144,7 +144,6 @@ app/debug/
 # Cursor (your IDE)
 .cursor/
 terminals/
-gradle.properties
 
 # PC tools and training data (not part of Android app)
 archive/
@@ -153,6 +152,7 @@ pose_pipeline_v2/
 modeling_v2/
 docs/
 estimatedH/
+software-tests/
 
 # Video files
 *.MOV
@@ -174,6 +174,7 @@ dist/
 MIGRATION_PLAN.md
 PROJECT_STATE_ANALYSIS.md
 cycles.txt
+DEPLOYMENT_GUIDE.md
 
 # Jupyter notebooks
 *.ipynb

@@ -3,6 +3,10 @@ package com.gaitvision.data
 import androidx.room.*
 import kotlinx.coroutines.flow.Flow
 
+// ─────────────────────────────────────────────────────────────
+// Existing entities (updated)
+// ─────────────────────────────────────────────────────────────
+
 @Entity(
     tableName = "patients",
     indices = [Index(value = ["participantId"], unique = false)]
@@ -14,7 +18,7 @@ data class PatientEntity(
     val firstName: String = "",
     val lastName: String = "",
     val age: Int? = null,
-    val gender: String? = null,
+    val biologicalSex: String = "",
     val height: Int = 0,
     val createdAt: Long = 0
 )
@@ -72,8 +76,83 @@ data class GaitScoreEntity(
     val rightKneeScore: Double? = null,
     val leftHipScore: Double? = null,
     val rightHipScore: Double? = null,
-    val torsoScore: Double? = null
+    val torsoScore: Double? = null,
+    val biologicalSex: String = ""
 )
+
+data class GaitScoreWithReview(
+    @Embedded val score: GaitScoreEntity,
+    @Relation(
+        parentColumn = "id",
+        entityColumn = "gaitScoreId"
+    )
+    val review: ClinicianReviewEntity?
+)
+
+// ─────────────────────────────────────────────────────────────
+// compliance entities
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Tracks patient consent to AI-assisted diagnosis.
+ */
+@Entity(
+    tableName = "ai_consents",
+    indices = [Index(value = ["patientId"], unique = true)],
+    foreignKeys = [ForeignKey(
+        entity = PatientEntity::class,
+        parentColumns = ["id"],
+        childColumns = ["patientId"],
+        onDelete = ForeignKey.CASCADE
+    )]
+)
+data class AiConsentEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val patientId: Long = 0,
+    val consentGiven: Boolean = false,
+    val consentTimestamp: Long = 0
+)
+
+/**
+ * Tracks clinician review of AI-generated gait scores.
+ */
+@Entity(
+    tableName = "clinician_reviews",
+    indices = [Index(value = ["gaitScoreId"], unique = true)],
+    foreignKeys = [ForeignKey(
+        entity = GaitScoreEntity::class,
+        parentColumns = ["id"],
+        childColumns = ["gaitScoreId"],
+        onDelete = ForeignKey.CASCADE
+    )]
+)
+data class ClinicianReviewEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val gaitScoreId: Long = 0,
+    val isReviewed: Boolean = false,
+    val reviewTimestamp: Long = 0,
+    val notes: String? = null
+)
+
+/**
+ * HIPAA audit trail entry records every PHI access event.
+ */
+@Entity(tableName = "audit_logs")
+data class AuditLogEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    /** One of: VIEW_PATIENT, VIEW_RESULTS, RUN_ANALYSIS, EXPORT_CSV */
+    val action: String = "",
+    val targetPatientId: Long? = null,
+    val targetRecordId: Long? = null,
+    val timestamp: Long = 0
+)
+
+// ─────────────────────────────────────────────────────────────
+// DAOs
+// ─────────────────────────────────────────────────────────────
 
 @Dao
 interface PatientDao {
@@ -85,6 +164,9 @@ interface PatientDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPatient(patient: PatientEntity): Long
+
+    @Update
+    suspend fun updatePatient(patient: PatientEntity)
 
     @Delete
     suspend fun deletePatient(patient: PatientEntity)
@@ -104,6 +186,10 @@ interface GaitScoreDao {
     @Query("SELECT * FROM gait_scores WHERE patientId = :patientId ORDER BY recordedAt ASC")
     fun getScoresForPatientFlow(patientId: Long): Flow<List<GaitScoreEntity>>
 
+    @Transaction
+    @Query("SELECT * FROM gait_scores WHERE patientId = :patientId ORDER BY recordedAt ASC")
+    fun getScoresWithReviewsForPatientFlow(patientId: Long): Flow<List<GaitScoreWithReview>>
+
     @Query("SELECT * FROM gait_scores WHERE id = :id")
     suspend fun getScoreById(id: Long): GaitScoreEntity?
 
@@ -115,4 +201,34 @@ interface GaitScoreDao {
 
     @Query("SELECT * FROM gait_scores ORDER BY recordedAt DESC")
     fun getAllScoresFlow(): Flow<List<GaitScoreEntity>>
+}
+
+@Dao
+interface AiConsentDao {
+    @Query("SELECT * FROM ai_consents WHERE patientId = :patientId LIMIT 1")
+    suspend fun getConsentForPatient(patientId: Long): AiConsentEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertConsent(consent: AiConsentEntity): Long
+}
+
+@Dao
+interface ClinicianReviewDao {
+    @Query("SELECT * FROM clinician_reviews WHERE gaitScoreId = :gaitScoreId LIMIT 1")
+    suspend fun getReviewForScore(gaitScoreId: Long): ClinicianReviewEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertReview(review: ClinicianReviewEntity): Long
+
+    @Query("SELECT COUNT(*) FROM clinician_reviews WHERE isReviewed = 0")
+    fun getUnreviewedCountFlow(): Flow<Int>
+}
+
+@Dao
+interface AuditLogDao {
+    @Insert
+    suspend fun insertLog(entry: AuditLogEntity)
+
+    @Query("SELECT * FROM audit_logs ORDER BY timestamp DESC")
+    fun getAllLogsFlow(): Flow<List<AuditLogEntity>>
 }

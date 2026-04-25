@@ -13,13 +13,27 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.gaitvision.data.AppDatabase
+import com.gaitvision.data.AuditLogger
 import com.gaitvision.logic.*
 import com.gaitvision.platform.FilePicker
 import com.gaitvision.platform.rememberCsvSharer
+import kotlinx.coroutines.launch
 
 @Composable
-fun CsvScreen(onNavigateBack: () -> Unit) {
+fun CsvScreen(
+    scoreId: Long,
+    database: AppDatabase,
+    onNavigateBack: () -> Unit
+) {
     val csvSharer = rememberCsvSharer()
+    val scope = rememberCoroutineScope()
+
+    var currentScoreId by remember { mutableStateOf<Long?>(null) }
+
+    LaunchedEffect(scoreId) {
+        currentScoreId = scoreId
+    }
 
     // Export state
     var exportStatus by remember { mutableStateOf("") }
@@ -65,7 +79,7 @@ fun CsvScreen(onNavigateBack: () -> Unit) {
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // ── Export Section ───────────────────────────────────────────────
+            // Export Section
             Text(
                 "EXPORT",
                 style = MaterialTheme.typography.caption,
@@ -86,16 +100,22 @@ fun CsvScreen(onNavigateBack: () -> Unit) {
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        "Export a sample gait analysis result as a CSV file compatible with the PC pipeline.",
+                        "Export the selected gait analysis result as a CSV file compatible with the PC pipeline. Score ID: ${currentScoreId ?: "unknown"}",
                         style = MaterialTheme.typography.body2,
                         color = Color.Gray
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Button(
                         onClick = {
-                            // Generate a sample CSV using GaitCsvExporter
+                            if (currentScoreId == null) {
+                                exportSuccess = false
+                                exportStatus = "No selected result found for export"
+                                return@Button
+                            }
+
+                            // Temporary sample export body, now tied to a selected result ID
                             val sampleDiagnostics = GaitDiagnostics(
-                                videoId = "sample_001",
+                                videoId = "score_${currentScoreId}",
                                 fpsDetected = 30f,
                                 durationS = 10f,
                                 numFramesTotal = 300,
@@ -132,19 +152,38 @@ fun CsvScreen(onNavigateBack: () -> Unit) {
                                 ridgeScore = 79f,
                                 pcaScore = 85f
                             )
+
+                            val participantId = "score_${currentScoreId}"
+                            val videoName = "selected_result_${currentScoreId}.mp4"
+
                             val csv = GaitCsvExporter.generateCsvString(
                                 features = sampleFeatures,
                                 diagnostics = sampleDiagnostics,
                                 score = sampleScore,
-                                participantId = "P001",
-                                videoName = "sample_video.mp4"
+                                participantId = participantId,
+                                videoName = videoName,
+                                biologicalSex = "Unknown",
+                                isReviewed = false,
+                                reviewTimestamp = null,
+                                aiConsentGiven = false,
+                                consentTimestamp = null
                             )
-                            val filename = GaitCsvExporter.generateFilename("P001")
+
+                            val filename = GaitCsvExporter.generateFilename(participantId)
                             val path = csvSharer.saveCsv(csv, filename)
+
                             if (path != null) {
                                 exportSuccess = true
                                 exportStatus = "Saved: $filename"
                                 csvSharer.shareCsv(path)
+                                scope.launch {
+                                    AuditLogger.log(
+                                        database.auditLogDao(),
+                                        "EXPORT_CSV",
+                                        patientId = null,
+                                        recordId = currentScoreId
+                                    )
+                                }
                             } else {
                                 exportSuccess = false
                                 exportStatus = "Export failed — check storage permissions"
@@ -167,7 +206,7 @@ fun CsvScreen(onNavigateBack: () -> Unit) {
                 }
             }
 
-            // ── Import Section ───────────────────────────────────────────────
+            // Import Section
             Text(
                 "IMPORT",
                 style = MaterialTheme.typography.caption,
@@ -235,9 +274,8 @@ fun CsvScreen(onNavigateBack: () -> Unit) {
                 }
             }
 
-            // ── Info ─────────────────────────────────────────────────────────
             Text(
-                "CSV files follow the PC pipeline format with participant ID, video name, gait metrics, and model scores.",
+                "CSV export is now tied to the selected analysis result through scoreId.",
                 style = MaterialTheme.typography.caption,
                 color = Color.Gray
             )

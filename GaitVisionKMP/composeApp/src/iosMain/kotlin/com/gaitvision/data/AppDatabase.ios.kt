@@ -11,5 +11,6 @@ fun getAppDatabase(): AppDatabase {
         factory =  { AppDatabaseConstructor.initialize() }
     )
         .setDriver(BundledSQLiteDriver())
+        .fallbackToDestructiveMigration(dropAllTables = true)
         .build()
 }

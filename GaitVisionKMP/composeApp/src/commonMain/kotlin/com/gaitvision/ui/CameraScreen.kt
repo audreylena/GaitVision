@@ -19,6 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gaitvision.data.AppDatabase
+import com.gaitvision.data.AuditLogger
 import com.gaitvision.data.VideoEntity
 import com.gaitvision.data.PatientEntity
 import com.gaitvision.logic.GaitAnalyzer
@@ -56,6 +57,7 @@ fun CameraScreen(
 
     // Helper to get actual patientId (creating anonymous one if needed)
     var resolvedPatientId by remember { mutableLongStateOf(patientId) }
+    var patientBiologicalSex by remember { mutableStateOf("") }
     
     LaunchedEffect(patientId) {
         if (patientId == 0L) {
@@ -77,6 +79,9 @@ fun CameraScreen(
                 )
                 resolvedPatientId = qid
             }
+        } else {
+            val p = database.patientDao().getPatientById(patientId)
+            patientBiologicalSex = p?.biologicalSex ?: ""
         }
     }
 
@@ -115,8 +120,13 @@ fun CameraScreen(
                             onPoseDetected = { p -> analyzer.addPose(p) }
                         )
 
-                        val scoreEntity = analyzer.analyze(patientId = resolvedPatientId, videoId = videoId)
+                        val scoreEntity = analyzer.analyze(
+                            patientId = resolvedPatientId,
+                            videoId = videoId,
+                            biologicalSex = patientBiologicalSex
+                        )
                         val scoreId = database.gaitScoreDao().insertScore(scoreEntity)
+                        AuditLogger.log(database.auditLogDao(), "RUN_ANALYSIS", patientId = resolvedPatientId, recordId = scoreId)
                         analyzer.clear()
                         isProcessing = false
                         onNavigateToResults(scoreId)
@@ -400,8 +410,13 @@ fun CameraScreen(
                                             recordedAt = Clock.System.now().toEpochMilliseconds()
                                         )
                                     )
-                                    val scoreEntity = analyzer.analyze(patientId = resolvedPatientId, videoId = videoId)
+                                    val scoreEntity = analyzer.analyze(
+                                        patientId = resolvedPatientId,
+                                        videoId = videoId,
+                                        biologicalSex = patientBiologicalSex
+                                    )
                                     val scoreId = database.gaitScoreDao().insertScore(scoreEntity)
+                                    AuditLogger.log(database.auditLogDao(), "RUN_ANALYSIS", patientId = resolvedPatientId, recordId = scoreId)
                                     analyzer.clear()
                                     isProcessing = false
                                     onNavigateToResults(scoreId)

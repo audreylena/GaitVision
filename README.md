@@ -29,6 +29,20 @@ Three machine learning models (Autoencoder, PCA, Ridge Regression) provide gait 
 
 ---
 
+## Team
+
+- Bracken Conner
+- Srinivasa Chivukula
+- Aghomi Dickson
+- Michael Hill
+- Richard Wang
+
+## Acknowledgment
+
+Jacob Gallagher - Research testing and analysis collaborator.
+
+---
+
 ## Features
 
 ### Capabilities
@@ -185,6 +199,7 @@ Special thanks to:
 - Dr. Rita Patterson
 - Dr. Mark Albert
 - University of North Texas
+- Capstone Team of 2024-25
 ---
 
-_Last Updated: January 2026_
+_Last Updated: April 2026_

@@ -190,3 +190,10 @@ refactor.py
 refactor2.py
 build_error.txt
 build_error_utf8.txt
+
+# Local Android Studio metadata (machine-specific)
+.idea/workspace.xml
+.idea/caches/
+.idea/deviceManager.xml
+.idea/other.xml
+.idea/migrations.xml

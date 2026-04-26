@@ -1,0 +1,268 @@
+package GaitVision.com.ui
+
+import android.content.Intent
+import android.graphics.Color
+import android.os.Bundle
+import android.view.View
+import android.view.ViewGroup
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
+import android.widget.LinearLayout
+import android.widget.EditText
+import android.widget.Spinner
+import android.widget.TextView
+import android.widget.Toast
+import androidx.lifecycle.lifecycleScope
+import GaitVision.com.R
+import GaitVision.com.data.AppDatabase
+import GaitVision.com.data.Patient
+import GaitVision.com.data.PatientDao
+import GaitVision.com.AnalysisSession
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+class PatientCreateActivity : BaseActivity() {
+
+    private lateinit var patientDao: PatientDao
+    
+    private lateinit var tvPatientId: TextView
+    private lateinit var etFirstName: EditText
+    private lateinit var etLastName: EditText
+    private lateinit var etAge: EditText
+    private lateinit var spinnerGender: Spinner
+    private lateinit var etFeet: EditText
+    private lateinit var etInches: EditText
+    private lateinit var etNotes: EditText
+    private lateinit var btnCreatePatient: LinearLayout
+    private lateinit var btnCreateAndAnalyze: LinearLayout
+
+    private var editingPatientId: Int = -1
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_patient_create)
+
+        val database = AppDatabase.getDatabase(this)
+        patientDao = database.patientDao()
+
+        // Determine if we're editing an existing patient
+        editingPatientId = intent.getLongExtra("patientId", -1).toInt()
+        val isEditing = editingPatientId != -1
+        setupCommonHeader(if (isEditing) "Edit Patient" else "New Patient")
+
+        initViews()
+        setupSpinners()
+        
+        if (editingPatientId > 0) {
+            loadPatientForEditing()
+        }
+    }
+
+    private fun initViews() {
+        tvPatientId = findViewById(R.id.tvPatientId)
+        etFirstName = findViewById(R.id.etFirstName)
+        etLastName = findViewById(R.id.etLastName)
+        etAge = findViewById(R.id.etAge)
+        spinnerGender = findViewById(R.id.spinnerGender)
+        etFeet = findViewById(R.id.etFeet)
+        etInches = findViewById(R.id.etInches)
+        etNotes = findViewById(R.id.etNotes)
+        btnCreatePatient = findViewById(R.id.btnCreatePatient)
+        btnCreateAndAnalyze = findViewById(R.id.btnCreateAndAnalyze)
+
+        btnCreatePatient.setOnClickListener {
+            if (validateInputs()) {
+                savePatient(startAnalysis = false)
+            }
+        }
+
+        btnCreateAndAnalyze.setOnClickListener {
+            if (validateInputs()) {
+                savePatient(startAnalysis = true)
+            }
+        }
+
+        if (editingPatientId > 0) {
+            // Update the child TextViews inside the LinearLayout rows
+            (btnCreatePatient.getChildAt(1) as? TextView)?.text = "Save Changes"
+            (btnCreateAndAnalyze.getChildAt(1) as? TextView)?.text = "Save & Start Analysis"
+        } else {
+            // Load next patient ID for new patient
+            loadNextPatientId()
+        }
+    }
+
+    private fun setupSpinners() {
+        // Gender spinner with custom adapter for proper text colors
+        val genderArray = resources.getStringArray(R.array.gender_array)
+        val genderAdapter = object : ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, genderArray) {
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                val view = super.getView(position, convertView, parent)
+                (view as TextView).setTextColor(Color.WHITE)
+                return view
+            }
+
+            override fun getDropDownView(position: Int, convertView: View?, parent: ViewGroup): View {
+                val view = super.getDropDownView(position, convertView, parent)
+                (view as TextView).setTextColor(Color.WHITE)
+                return view
+            }
+        }.apply {
+            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        }
+        spinnerGender.adapter = genderAdapter
+
+        // Set default height values
+        etFeet.setText("5")
+        etInches.setText("9")
+    }
+
+    private fun loadPatientForEditing() {
+        lifecycleScope.launch {
+            val patient = withContext(Dispatchers.IO) {
+                patientDao.getPatientById(editingPatientId)
+            }
+            
+            patient?.let {
+                tvPatientId.text = it.participantId?.toString() ?: "N/A"
+                etFirstName.setText(it.firstName)
+                etLastName.setText(it.lastName)
+                etAge.setText(it.age?.toString() ?: "")
+                
+                // Set gender spinner
+                val genderArray = resources.getStringArray(R.array.gender_array)
+                val genderIndex = genderArray.indexOf(it.gender ?: "")
+                if (genderIndex >= 0) spinnerGender.setSelection(genderIndex)
+                
+                // Set height EditTexts
+                val feet = it.height / 12
+                val inches = it.height % 12
+                etFeet.setText(feet.toString())
+                etInches.setText(inches.toString())
+            }
+        }
+    }
+
+    private fun loadNextPatientId() {
+        lifecycleScope.launch {
+            val nextId = withContext(Dispatchers.IO) {
+                patientDao.getNextPatientId()
+            }
+            tvPatientId.text = nextId.toString()
+        }
+    }
+
+    private fun validateInputs(): Boolean {
+        val firstName = etFirstName.text.toString().trim()
+        val lastName = etLastName.text.toString().trim()
+
+        if (firstName.isEmpty()) {
+            etFirstName.error = "First name is required"
+            etFirstName.requestFocus()
+            return false
+        }
+
+        if (lastName.isEmpty()) {
+            etLastName.error = "Last name is required"
+            etLastName.requestFocus()
+            return false
+        }
+
+        // Validate feet and inches
+        for ((editText, name, max) in listOf(
+            Triple(etFeet, "Feet", 8),
+            Triple(etInches, "Inches", 11)
+        )) {
+            val str = editText.text.toString().trim()
+            if (str.isEmpty()) {
+                editText.error = "$name is required"
+                editText.requestFocus()
+                return false
+            }
+
+            val value = str.toIntOrNull()
+            if (value == null || value < 0 || value > max) {
+                editText.error = "$name must be between 0 and $max"
+                editText.requestFocus()
+                return false
+            }
+        }
+
+        return true
+    }
+
+    private fun savePatient(startAnalysis: Boolean) {
+        val firstName = etFirstName.text.toString().trim()
+        val lastName = etLastName.text.toString().trim()
+        val age = etAge.text.toString().toIntOrNull()
+        val gender = if (spinnerGender.selectedItemPosition > 0) {
+            spinnerGender.selectedItem.toString()
+        } else null
+        
+        val feet = etFeet.text.toString().trim().toInt()
+        val inches = etInches.text.toString().trim().toInt()
+        val heightInInches = (feet * 12) + inches
+
+        lifecycleScope.launch {
+            val patientId: Long
+            
+            if (editingPatientId > 0) {
+                // Update existing patient
+                // We must use the Update method to avoid replacing the record and triggering cascade delete
+                val existing = withContext(Dispatchers.IO) {
+                    patientDao.getPatientById(editingPatientId)
+                } ?: return@launch
+
+                val updatedPatient = existing.copy(
+                    firstName = firstName,
+                    lastName = lastName,
+                    age = age,
+                    gender = gender,
+                    height = heightInInches,
+                    lastModifiedAt = System.currentTimeMillis()
+                )
+
+                withContext(Dispatchers.IO) {
+                    patientDao.updatePatient(updatedPatient)
+                }
+                
+                patientId = editingPatientId.toLong()
+            } else {
+                // Create new patient
+                val newPatient = Patient(
+                    firstName = firstName,
+                    lastName = lastName,
+                    age = age,
+                    gender = gender,
+                    height = heightInInches
+                )
+
+                patientId = withContext(Dispatchers.IO) {
+                    patientDao.insertPatient(newPatient)
+                }
+            }
+
+            withContext(Dispatchers.Main) {
+                Toast.makeText(
+                    this@PatientCreateActivity,
+                    if (editingPatientId > 0) "Patient updated" else "Patient created",
+                    Toast.LENGTH_SHORT
+                ).show()
+
+                if (startAnalysis) {
+                    AnalysisSession.participantId = patientId.toInt()
+                    AnalysisSession.participantHeight = heightInInches
+                    AnalysisSession.currentPatientId = patientId.toInt()
+
+                    // Go to video picker
+                    val intent = Intent(this@PatientCreateActivity, VideoPickerActivity::class.java)
+                    intent.putExtra("fromPatientProfile", true)
+                    startActivity(intent)
+                }
+                
+                finish()
+            }
+        }
+    }
+}

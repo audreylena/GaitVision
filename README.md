@@ -1,6 +1,8 @@
 # GaitVision
 
-_2-D Gait Analysis for clinical use._
+**2D Gait Analysis for Clinical Use**
+
+An Android application for clinical gait assessment using computer vision and machine learning. The system processes 2D video on device to extract gait features for assessment.
 
 ---
 
@@ -8,110 +10,181 @@ _2-D Gait Analysis for clinical use._
 
 - [Overview](#overview)
 - [Features](#features)
-- [Technology](#technology)
+- [Requirements](#requirements)
+- [Technology Stack](#technology-stack)
 - [Installation](#installation)
 - [Usage](#usage)
-- [Contact](#contact)
-- [References](#References)
+- [Dataset & Validation](#dataset--validation)
+- [References](#references)
+- [Acknowledgments](#acknowledgments)
 
 ---
 
 ## Overview
+GaitVision is an Android application focused on improving access to gait analysis in low-resource settings. It requires minimal hardware—only a smartphone with a camera or stored video.
 
-GaitVision in an android application focused on solving the problem of lower technology access for gait analysis in developing parts of the world. Using a minimum amount of hardware only requiring:
-1. Android phone
-2. GaitVision Software
-3. Camera access OR stored videos
+The application implements a video-based gait analysis pipeline on Android (API 24+). It extracts pose landmarks from video frames, computes gait signals, detects stride cycles, and calculates 16 clinical features across temporal, spatial, kinematic, and smoothness domains.
+
+Three machine learning models (Autoencoder, PCA, Ridge Regression) provide gait quality assessments, achieving >0.97 AUC for normal vs impaired classification.
 
 ---
 
 ## Features
 
-- [Record Videos in App]
-- [Alter Input video to show angles at timepoint]
-- [Show gait score estimate from autoencoder]
-- [Show graph of angles for analysis]
-- [Store CSV of angles on local machine for later use]
+### Capabilities
+- Video input from camera (WIP) or device storage
+- 16 gait features: cadence, stride time/length, knee ROM, movement smoothness (LDJ), trunk stability, asymmetry metrics
+- Pose wireframe and angle overlay visualization
+- Time-series charts for joint angles and gait signals
+- Patient database with analysis history tracking
+- CSV export of features and angle data
+
+### Analysis
+1. MediaPipe extracts 33 landmarks per frame from input video, currently only using 6 to extract signals and features
+2. Computes joint angles, inter-ankle distance, velocities; applies EMA smoothing and interpolation
+3. Three detection modes (inter-ankle distance, ankle velocity, knee angle) evaluated; best mode selected automatically
+4. Calculates 16 features from detected stride cycles (temporal, spatial, kinematic, smoothness). Feature data is only gathered from chosen gait cycles
+5. Three models (Autoencoder, PCA, Ridge) generate independent scores (0-100 scale)
 
 ---
 
-## Technology
+## Requirements
 
-- **Language:** Kotlin / Java
-- **UI Framework:** Android XML
-- **Pose Detection:** MLKit
-- **Gait Score:** Autoencoder
+### Runtime
+- Android 7.0+ (API level 24)
+- Camera, storage, and media permissions
+- Sufficient storage for video and analysis data
+
+### Development
+- Android Studio
+- JDK 8+
+- Gradle (via wrapper)
+- Android SDK API 24-34
+
+---
+
+## Technology Stack
+
+- Android (Kotlin)
+- MediaPipe Tasks Vision
+- TensorFlow Lite
+- Room (SQLite)
 
 ---
 
 ## Installation
 
-### Steps
+### For End Users (APK Installation)
 
-1. Transfer .apk file to android compatible device
-2. Open .apk file in filemanager
-3. Click install and allow all
+1. Transfer the `.apk` file to your Android-compatible device  
+2. Open the `.apk` file using a file manager  
+3. Click "Install" and allow installation from unknown sources if prompted  
+4. Grant all required permissions when prompted  
 
 ---
 
 ## PC Development Environment Setup
 
 ### Requirements
-
-- Git
-- Android Studio
-- JDK 17 or compatible version
+- Git  
+- Android Studio  
+- JDK 17 or compatible version  
 
 ### Setup Steps
+1. Clone the repository  
+2. Open the project in Android Studio  
+3. Allow Gradle to sync and install dependencies  
+4. Install any required SDK components if prompted  
+5. Select the Android app configuration  
+6. Run the app on an emulator or connected Android device  
 
-1. Clone the repository
-2. Open the project in Android Studio
-3. Allow Gradle to sync and install dependencies
-4. Install any required SDK components if prompted
-5. Select the Android app configuration
-6. Run the app on an emulator or connected Android device
+---
+
+## Preferred Method (Android Studio)
+
+1. Clone or download the repository  
+2. Open the project in Android Studio  
+3. Wait for Gradle sync to complete  
+4. Connect an Android device via USB  
+5. Enable USB debugging on the device  
+6. Alternatively, Android Studio emulators may have reduced performance during video processing  
 
 ---
 
 ## Deployment Artifacts
 
 The following artifacts should be included for deployment:
-
-- Android APK file
-- Source code repository, GitHub
-- Autoencoder (AE) model files
-- PCA model files
-- Linear regression scoring model
-- Sample test videos
-- Installation and setup instructions
+- Android APK file  
+- Source code repository (GitHub)  
+- Autoencoder (AE) model files  
+- PCA model files  
+- Linear regression scoring model  
+- Sample test videos  
+- Installation and setup instructions  
 
 ---
+
+## Build from Source (Optional)
+
+```bash
+git clone https://github.com/SrinivasaChivukula/GaitVision/
+cd GaitVision
+./gradlew build
+./gradlew installDebug
+```
 
 ## Usage
 
-- Launch the app.
-- Input Unique Participant ID.
-- Input participant height in the form FEET INCHES
-- Click Record video or Select video
-- Have participant walk as they normally would for minimum 2 gait cycles ( roughly 5 seconds )
-- Click Perform Analysis
-- View Video then click View Analysis
-- Select graphs as needed
-- Export CSV or return to main menu
+1. Create or select a patient profile and input required information:
+   - Unique Participant ID
+   - Participant height (feet and inches)
 
----
+2. Select or record video:
+   - Click "Record Video" to capture a new video, or
+   - Click "Select Video" to choose an existing video from storage
 
-## Contact
+3. Record walking pattern:
+   - Have the participant walk normally
+   - Ensure at least 2 complete gait cycles (approximately 5 seconds)
+   - Record from a side view
 
-contact for clarification at nathaniel.schimpf@gmail.com
+4. Perform analysis:
+   - Click "Perform Analysis" to process the video
+   - Wait for analysis to complete
+
+5. View and export results:
+   - Review the annotated video showing angles at each timepoint
+   - Click "View Analysis" to see detailed results and graphs
+   - Select graphs as needed
+   - Export CSV file or return to the main menu
+   
+## Dataset & Validation
+
+### Training Dataset
+Models trained on the [Gait Dataset for Knee Osteoarthritis and Parkinson's Disease Analysis With Severity Levels](https://data.mendeley.com/datasets/44pfnysy89/1)
+
+- AUC: >0.97 (normal vs impaired classification)
+- Validation: 5-fold patient-level cross-validation
+- Clinical correlation: Spearman ρ=0.82
 
 ---
 
 ## References
--[MPAndroidChart](https://github.com/PhilJay/MPAndroidChart) by Phil Jay (Apache 2.0 License)
+
+- [MediaPipe](https://developers.google.com/mediapipe/solutions/vision/pose_landmarker) by Google
+- [TensorFlow Lite](https://www.tensorflow.org/lite) by Google
+- [MPAndroidChart](https://github.com/PhilJay/MPAndroidChart) by PhilJay (Apache 2.0 License)
+- [Android Room & Kotlin](https://developer.android.com/training/data-storage/room)
+- Kour, N., Gupta, S., & Arora, S. (2020). [Gait Dataset for Knee Osteoarthritis and Parkinson's Disease Analysis With Severity Levels. Mendeley Data, V1.](https://doi.org/10.17632/44pfnysy89.1)
+---
+
+## Acknowledgments
 
 Special thanks to:
-Guna Sindhuja Siripurapu 
-Dr. Rita Patterson
-Dr. Mark Albert
-University of North Texas
+- Guna Sindhuja Siripurapu 
+- Dr. Rita Patterson
+- Dr. Mark Albert
+- University of North Texas
+---
+
+_Last Updated: January 2026_

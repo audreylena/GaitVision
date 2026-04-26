@@ -1,14 +1,17 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
-    alias(libs.plugins.kotlin.compose)
-
+    id("kotlin-kapt")
+    id("kotlin-parcelize")
 }
 
 android {
     namespace = "GaitVision.com"
     compileSdk = 34
 
+    buildFeatures {
+        buildConfig = true
+    }
 
     defaultConfig {
         applicationId = "GaitVision.com"
@@ -17,9 +20,6 @@ android {
         versionCode = 1
         versionName = "1.0"
 
-        ndk {
-            abiFilters += listOf("arm64-v8a","x86_64")
-        }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -39,16 +39,19 @@ android {
     kotlinOptions {
         jvmTarget = "1.8"
     }
-    buildFeatures {
-        compose = true
-    }
     viewBinding {
         enable = true
     }
     dataBinding{
         enable = true
     }
-
+    
+    // Ensure native libraries from MediaPipe are properly packaged
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
 }
 
 
@@ -56,22 +59,12 @@ dependencies {
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
-    implementation(libs.androidx.activity.compose)
-    implementation(platform(libs.androidx.compose.bom))
-    implementation(libs.androidx.ui)
-    implementation(libs.androidx.ui.graphics)
-    implementation(libs.androidx.ui.tooling.preview)
-    implementation(libs.androidx.material3)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
     implementation(libs.androidx.activity)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
-    androidTestImplementation(platform(libs.androidx.compose.bom))
-    androidTestImplementation(libs.androidx.ui.test.junit4)
-    debugImplementation(libs.androidx.ui.tooling)
-    debugImplementation(libs.androidx.ui.test.manifest)
 
     // constraintLayout dependency
     implementation(libs.androidx.constraintlayout)
@@ -79,24 +72,10 @@ dependencies {
     // Graph dependency
     implementation("com.github.PhilJay:MPAndroidChart:3.1.0")
 
-    /*
-        Type: Base SDK
-        Usage: Used for applications that are more time sensitive. Excels in speed over accuracy.
-            - Processing live stream.
-        Cons:
-            - Lower accuracy
-     */
-    implementation("com.google.mlkit:pose-detection:18.0.0-beta5")
-    /*
-        Type: Accurate SDK
-        Usage: Used for applications that need accuracy. Excels in accuracy over speed.
-            - Processing stored video.
-        Cons:
-            - Slower processing speed
-            - More CPU usage
-            - More power and battery required
-     */
-    implementation("com.google.mlkit:pose-detection-accurate:18.0.0-beta5")
+    // MediaPipe Tasks for pose detection (replaced MLKit for PC pipeline parity)
+    // UPGRADED to 0.10.29 to fix UnsatisfiedLinkError (missing libmediapipe_tasks_vision_jni.so on emulator/x86)
+    // and to match the working Google sample linked in issues page
+    implementation("com.google.mediapipe:tasks-vision:0.10.29")
 
     implementation("androidx.core:core-ktx:1.7.0")
 
@@ -110,5 +89,13 @@ dependencies {
 
     implementation("org.tensorflow:tensorflow-lite:2.13.0")
     implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
+
+    // Room Database
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    kapt(libs.androidx.room.compiler)
+
+    // Kotlin reflection (used by AnalysisHistoryActivity to dynamically build table columns)
+    implementation(kotlin("reflect"))
 
 }

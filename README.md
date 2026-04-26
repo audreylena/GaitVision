@@ -15,23 +15,24 @@ An Android application for clinical gait assessment using computer vision and ma
 - [Installation](#installation)
 - [Usage](#usage)
 - [Dataset & Validation](#dataset--validation)
-+ [Dataset & Validation](#dataset-validation)
-- [References](#References)
-+ [References](#references)
+- [References](#references)
 - [Acknowledgments](#acknowledgments)
 
 ---
 
 ## Overview
+GaitVision is an Android application focused on improving access to gait analysis in low-resource settings. It requires minimal hardware—only a smartphone with a camera or stored video.
 
-GaitVision implements a video-based gait analysis pipeline on Android (API 24+) requiring only a smartphone camera. The system extracts pose landmarks from video frames, computes gait signals, detects stride cycles, and calculates 16 clinical features across temporal, spatial, kinematic, and smoothness domains. Three machine learning models (Autoencoder, PCA, Ridge Regression) provide gait quality assessments, achieving >0.97 AUC for normal vs impaired classification.
+The application implements a video-based gait analysis pipeline on Android (API 24+). It extracts pose landmarks from video frames, computes gait signals, detects stride cycles, and calculates 16 clinical features across temporal, spatial, kinematic, and smoothness domains.
+
+Three machine learning models (Autoencoder, PCA, Ridge Regression) provide gait quality assessments, achieving >0.97 AUC for normal vs impaired classification.
 
 ---
 
 ## Features
 
 ### Capabilities
-- Video input from camera(WIP) or device storage
+- Video input from camera (WIP) or device storage
 - 16 gait features: cadence, stride time/length, knee ROM, movement smoothness (LDJ), trunk stability, asymmetry metrics
 - Pose wireframe and angle overlay visualization
 - Time-series charts for joint angles and gait signals
@@ -75,22 +76,55 @@ GaitVision implements a video-based gait analysis pipeline on Android (API 24+) 
 
 ### For End Users (APK Installation)
 
-1. Transfer the `.apk` file to your Android-compatible device
-2. Open the `.apk` file using a file manager
-3. Click "Install" and allow installation from unknown sources if prompted
-4. Grant all required permissions when prompted
+1. Transfer the `.apk` file to your Android-compatible device  
+2. Open the `.apk` file using a file manager  
+3. Click "Install" and allow installation from unknown sources if prompted  
+4. Grant all required permissions when prompted  
 
-### Preferred Method (Android Studio)
+---
 
-1. Clone or download the repository
-2. Open the project in Android Studio
-3. Wait for Gradle sync to complete
-4. Connect an Android device via USB
-5. Enable USB debugging on the device
-6. Alternatively, Android Studio emulators work but may have degraded performance during video processing
+## PC Development Environment Setup
 
+### Requirements
+- Git  
+- Android Studio  
+- JDK 17 or compatible version  
 
-### Build from Source (Outdated, Untested)
+### Setup Steps
+1. Clone the repository  
+2. Open the project in Android Studio  
+3. Allow Gradle to sync and install dependencies  
+4. Install any required SDK components if prompted  
+5. Select the Android app configuration  
+6. Run the app on an emulator or connected Android device  
+
+---
+
+## Preferred Method (Android Studio)
+
+1. Clone or download the repository  
+2. Open the project in Android Studio  
+3. Wait for Gradle sync to complete  
+4. Connect an Android device via USB  
+5. Enable USB debugging on the device  
+6. Alternatively, Android Studio emulators may have reduced performance during video processing  
+
+---
+
+## Deployment Artifacts
+
+The following artifacts should be included for deployment:
+- Android APK file  
+- Source code repository (GitHub)  
+- Autoencoder (AE) model files  
+- PCA model files  
+- Linear regression scoring model  
+- Sample test videos  
+- Installation and setup instructions  
+
+---
+
+## Build from Source (Optional)
 
 ```bash
 git clone https://github.com/SrinivasaChivukula/GaitVision/
@@ -99,15 +133,11 @@ cd GaitVision
 ./gradlew installDebug
 ```
 
-   Or use the provided scripts:
-   - Windows: `run_app.bat` or `run_app.ps1`
-   - Linux/Mac: `./gradlew installDebug`
-
----
-
 ## Usage
 
-1. Create or select a patient profile with demographic information
+1. Create or select a patient profile and input required information:
+   - Unique Participant ID
+   - Participant height (feet and inches)
 
 2. Select or record video:
    - Click "Record Video" to capture a new video, or
@@ -125,10 +155,9 @@ cd GaitVision
 5. View and export results:
    - Review the annotated video showing angles at each timepoint
    - Click "View Analysis" to see detailed results and graphs
-   - Export CSV file containing all angle measurements
-
----
-
+   - Select graphs as needed
+   - Export CSV file or return to the main menu
+   
 ## Dataset & Validation
 
 ### Training Dataset
@@ -152,12 +181,10 @@ Models trained on the [Gait Dataset for Knee Osteoarthritis and Parkinson's Dise
 ## Acknowledgments
 
 Special thanks to:
-
-- Guna Sindhuja Siripurapu
+- Guna Sindhuja Siripurapu 
 - Dr. Rita Patterson
 - Dr. Mark Albert
 - University of North Texas
-
 ---
 
 _Last Updated: January 2026_

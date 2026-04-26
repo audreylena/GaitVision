@@ -183,6 +183,8 @@ DEPLOYMENT_GUIDE.md
 # Large model files that shouldn't be in regular commits
 # (pose_landmarker_heavy.task is needed but large - 35MB)
 
-# Old backup files
+# Old backup/scratch files
 old_gaitscorer.kt
 old_gaitscorer_utf8.kt
+refactor.py
+refactor2.py

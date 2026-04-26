@@ -18,7 +18,7 @@ _2-D Gait Analysis for clinical use._
 
 ## Overview
 
-GaitVision in an android application focused on solving the problem of lower technology access for gait analysis in developing parts of the world. Using a minimum ammount of hardware only requiring:
+GaitVision in an android application focused on solving the problem of lower technology access for gait analysis in developing parts of the world. Using a minimum amount of hardware only requiring:
 1. Android phone
 2. GaitVision Software
 3. Camera access OR stored videos
@@ -48,20 +48,49 @@ GaitVision in an android application focused on solving the problem of lower tec
 
 ### Steps
 
-```
-
 1. Transfer .apk file to android compatible device
 2. Open .apk file in filemanager
 3. Click install and allow all
 
-```
+---
+
+## PC Development Environment Setup
+
+### Requirements
+
+- Git
+- Android Studio
+- JDK 17 or compatible version
+
+### Setup Steps
+
+1. Clone the repository
+2. Open the project in Android Studio
+3. Allow Gradle to sync and install dependencies
+4. Install any required SDK components if prompted
+5. Select the Android app configuration
+6. Run the app on an emulator or connected Android device
+
+---
+
+## Deployment Artifacts
+
+The following artifacts should be included for deployment:
+
+- Android APK file
+- Source code repository, GitHub
+- Autoencoder (AE) model files
+- PCA model files
+- Linear regression scoring model
+- Sample test videos
+- Installation and setup instructions
 
 ---
 
 ## Usage
 
 - Launch the app.
-- Input Unique Particpaint ID.
+- Input Unique Participant ID.
 - Input participant height in the form FEET INCHES
 - Click Record video or Select video
 - Have participant walk as they normally would for minimum 2 gait cycles ( roughly 5 seconds )
@@ -85,4 +114,4 @@ Special thanks to:
 Guna Sindhuja Siripurapu 
 Dr. Rita Patterson
 Dr. Mark Albert
-Univeristy of North Texas
+University of North Texas

@@ -92,7 +92,8 @@ class ProgressOverTimeActivity : BaseActivity() {
 
         if (patientIdArg <= 0) { finish(); return }
 
-        setupCommonHeader("Progress — $patientName")
+        setupCommonHeader("Progress")
+        setHeaderSubtitle(patientName)
 
         analysisResultDao = AppDatabase.getDatabase(this).analysisResultDao()
         chartContainer    = findViewById(R.id.chartContainer)

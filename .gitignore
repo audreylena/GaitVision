@@ -191,6 +191,10 @@ refactor2.py
 build_error.txt
 build_error_utf8.txt
 
+# Research/reference PDFs dropped in the working tree
+batch/
+*.pdf
+
 # Local Android Studio metadata (machine-specific)
 .idea/workspace.xml
 .idea/caches/

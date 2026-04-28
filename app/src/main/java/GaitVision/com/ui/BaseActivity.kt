@@ -43,9 +43,12 @@ abstract class BaseActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * custom back button action
-     */
+    protected fun setHeaderSubtitle(subtitle: String) {
+        val tv = findViewById<TextView>(R.id.tvSubtitle) ?: return
+        tv.text = subtitle
+        tv.visibility = if (subtitle.isNotEmpty()) View.VISIBLE else View.GONE
+    }
+
     protected fun setCustomBackAction(action: () -> Unit) {
         btnBack?.apply {
             visibility = View.VISIBLE

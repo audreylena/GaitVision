@@ -9,6 +9,7 @@ import android.util.Log
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.MediaController
+import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import android.widget.VideoView
@@ -22,17 +23,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import GaitVision.com.R
-import GaitVision.com.data.AnalysisResult
-import GaitVision.com.data.SignalData
 import GaitVision.com.data.AppDatabase
-import GaitVision.com.data.repository.AnalysisResultRepository
-import GaitVision.com.data.repository.SignalDataRepository
 import GaitVision.com.data.repository.PatientRepository
 import GaitVision.com.ProcVidEmpty
 import GaitVision.com.AnalysisSession
-import android.provider.OpenableColumns
-import org.json.JSONArray
-import org.json.JSONObject
+import GaitVision.com.persistCurrentSession
 import java.io.File
 
 class AnalysisActivity : BaseActivity() {
@@ -171,7 +166,10 @@ class AnalysisActivity : BaseActivity() {
                 }
 
                 AnalysisSession.editedUri = withContext(Dispatchers.IO) {
-                    ProcVidEmpty(this@AnalysisActivity, outputFilePath, this@AnalysisActivity)
+                    ProcVidEmpty(this@AnalysisActivity, outputFilePath) { stage, percent ->
+                        // pipeline runs on IO, view writes need Main
+                        runOnUiThread { updateProcessingProgress(stage, percent) }
+                    }
                 }
 
                 // Save video and angle data to database
@@ -200,129 +198,50 @@ class AnalysisActivity : BaseActivity() {
         }
     }
 
+    private var processingUiInitialized = false
+
+    // Drives the splitting progress bar from pipeline callbacks. The second
+    // bar (CreationText/VideoCreation) stayed hidden in the old flow too; it
+    // was only ever shown during the disabled ROI retry path.
+    private fun updateProcessingProgress(stage: String, percent: Int) {
+        val splittingText = findViewById<TextView>(R.id.SplittingText)
+        val splittingBar = findViewById<ProgressBar>(R.id.splittingBar)
+        val splittingValue = findViewById<TextView>(R.id.splittingProgressValue)
+
+        when (stage) {
+            "processing" -> {
+                if (!processingUiInitialized) {
+                    splittingText.text = "Processing..."
+                    splittingText.visibility = View.VISIBLE
+                    splittingBar.visibility = View.VISIBLE
+                    splittingValue.visibility = View.VISIBLE
+                    findViewById<TextView>(R.id.CreationText).visibility = View.GONE
+                    findViewById<ProgressBar>(R.id.VideoCreation).visibility = View.GONE
+                    findViewById<TextView>(R.id.CreatingProgressValue).visibility = View.GONE
+                    processingUiInitialized = true
+                }
+                splittingBar.progress = percent
+                splittingValue.text = " $percent%"
+            }
+            "done" -> {
+                splittingText.visibility = View.GONE
+                splittingBar.visibility = View.GONE
+                splittingValue.visibility = View.GONE
+                processingUiInitialized = false
+            }
+        }
+    }
+
     private suspend fun saveToDatabase(database: AppDatabase, outputPath: String) {
         if (!shouldSave || AnalysisSession.currentPatientId == null || AnalysisSession.editedUri == null) return
-
         try {
-            val resultRepo = AnalysisResultRepository(database.analysisResultDao())
-            val signalRepo = SignalDataRepository(database.signalDataDao())
-
-            withContext(Dispatchers.IO) {
-                val videoName = AnalysisSession.galleryUri?.let { uri ->
-                    contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
-                        if (cursor.moveToFirst()) cursor.getString(0) else null
-                    }
-                } ?: ""
-                val features = AnalysisSession.extractedFeatures
-                val score = AnalysisSession.scoringResult
-                val diagnostics = AnalysisSession.extractionDiagnostics
-
-                // Save analysis result (replaces old Video + GaitScore saves)
-                val result = AnalysisResult(
-                    patientId = AnalysisSession.currentPatientId!!,
-                    videoFileName = videoName,
-                    videoLengthMicroseconds = AnalysisSession.videoLength,
-                    recordedAt = AnalysisSession.recordingDate,
-
-                    // Scores
-                    overallScore = score?.getScoreForDatabase(),
-                    aeScore = score?.aeScore,
-                    ridgeScore = score?.ridgeScore,
-                    pcaScore = score?.pcaScore,
-
-                    // Pipeline metadata
-                    stepSignalMode = AnalysisSession.stepSignalMode,
-                    validStrideCount = features?.valid_stride_count ?: 0,
-                    qualityFlag = diagnostics?.qualityFlag?.name,
-
-                    // Diagnostics
-                    fpsDetected = diagnostics?.fpsDetected,
-                    numFramesTotal = diagnostics?.numFramesTotal ?: 0,
-                    numFramesValid = diagnostics?.numFramesValid ?: 0,
-                    validFrameRate = diagnostics?.validFrameRate,
-                    numStepsDetected = diagnostics?.numStepsDetected ?: 0,
-                    walkingDirection = diagnostics?.walkingDirection,
-                    wasFlipped = diagnostics?.wasFlipped ?: false,
-
-                    // 16 features
-                    cadenceSpm = features?.cadence_spm,
-                    strideTimeS = features?.stride_time_s,
-                    strideTimeCv = features?.stride_time_cv,
-                    stepTimeAsymmetry = features?.step_time_asymmetry,
-                    strideLengthNorm = features?.stride_length_norm,
-                    strideAmpNorm = features?.stride_amp_norm,
-                    stepLengthAsymmetry = features?.step_length_asymmetry,
-                    kneeLeftRom = features?.knee_left_rom,
-                    kneeRightRom = features?.knee_right_rom,
-                    kneeLeftMax = features?.knee_left_max,
-                    kneeRightMax = features?.knee_right_max,
-                    ldjKneeLeft = features?.ldj_knee_left,
-                    ldjKneeRight = features?.ldj_knee_right,
-                    ldjHip = features?.ldj_hip,
-                    trunkLeanStdDeg = features?.trunk_lean_std_deg,
-                    interAnkleCv = features?.inter_ankle_cv,
-
-                    stridesJson = AnalysisSession.extractedStrides?.let { strides ->
-                        JSONArray().apply {
-                            strides.forEach { s ->
-                                put(JSONObject().apply {
-                                    put("sf", s.startFrame)
-                                    put("ef", s.endFrame)
-                                    put("st", s.startTimeS)
-                                    put("et", s.endTimeS)
-                                    put("s1f", s.step1Frame)
-                                    put("s2f", s.step2Frame)
-                                    put("s1t", s.step1TimeS)
-                                    put("s2t", s.step2TimeS)
-                                    put("v", s.isValid)
-                                    put("r", s.invalidReason ?: JSONObject.NULL)
-                                })
-                            }
-                        }.toString()
-                    },
-                    selectedStrideIndicesJson = AnalysisSession.selectedStrideIndices?.let {
-                        JSONArray(it).toString()
-                    }
-                )
-                val resultId = resultRepo.insertResult(result)
-                AnalysisSession.currentResultId = resultId
-
-                // Save per-frame signal data for graph reload
-                val signals = AnalysisSession.extractedSignals
-                if (signals != null) {
-                    val signalDataList = mutableListOf<SignalData>()
-                    val maxFrames = signals.kneeAngleLeft.size
-
-                    for (frame in 0 until maxFrames) {
-                        signalDataList.add(SignalData(
-                            resultId = resultId,
-                            frameNumber = frame,
-                            interAnkleDist = signals.interAnkleDist.getOrNull(frame)?.takeIf { !it.isNaN() },
-                            kneeAngleLeft = signals.kneeAngleLeft.getOrNull(frame)?.takeIf { !it.isNaN() },
-                            kneeAngleRight = signals.kneeAngleRight.getOrNull(frame)?.takeIf { !it.isNaN() },
-                            trunkAngle = signals.trunkAngle.getOrNull(frame)?.takeIf { !it.isNaN() },
-                            ankleLeftY = signals.ankleLeftY.getOrNull(frame)?.takeIf { !it.isNaN() },
-                            ankleRightY = signals.ankleRightY.getOrNull(frame)?.takeIf { !it.isNaN() },
-                            hipLeftY = signals.hipLeftY.getOrNull(frame)?.takeIf { !it.isNaN() },
-                            hipRightY = signals.hipRightY.getOrNull(frame)?.takeIf { !it.isNaN() },
-                            ankleLeftVy = signals.ankleLeftVy.getOrNull(frame)?.takeIf { !it.isNaN() },
-                            ankleRightVy = signals.ankleRightVy.getOrNull(frame)?.takeIf { !it.isNaN() },
-                            isValid = signals.isValid.getOrNull(frame) ?: true,
-                            timestamp = signals.timestamps.getOrNull(frame)?.takeIf { !it.isNaN() }
-                        ))
-                    }
-
-                    if (signalDataList.isNotEmpty()) {
-                        signalRepo.insertSignalDataList(signalDataList)
-                    }
-
-                    Log.d("AnalysisActivity", "Saved result ID: $resultId with ${signalDataList.size} signal records")
-                } else {
-                    Log.d("AnalysisActivity", "Saved result ID: $resultId (no signals)")
-                }
-            }
+            persistCurrentSession(
+                context = this@AnalysisActivity,
+                db = database,
+                patientId = AnalysisSession.currentPatientId!!
+            )
         } catch (e: Exception) {
-            Log.e("AnalysisActivity", "Error saving to database: ${e.message}", e)
+            Log.e("AnalysisActivity", "DB save failed: ${e.message}", e)
             withContext(Dispatchers.Main) {
                 Toast.makeText(this@AnalysisActivity, "Warning: failed to save to database", Toast.LENGTH_LONG).show()
             }

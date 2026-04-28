@@ -12,14 +12,19 @@ import android.widget.Toast
 import android.net.Uri
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.PickVisualMediaRequest
+import androidx.lifecycle.lifecycleScope
 import GaitVision.com.R
 import GaitVision.com.AnalysisSession
+import GaitVision.com.extractRecordingDate
 import android.widget.ImageButton
 import android.app.DatePickerDialog
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 import java.util.Date
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class VideoPickerActivity : BaseActivity() {
 
@@ -79,6 +84,16 @@ class VideoPickerActivity : BaseActivity() {
                     videoView.setVideoURI(videoUri)
                     videoView.start()
 
+                    // Pre-fill the date picker from embedded metadata.
+                    // Clinician still has to confirm (or change) before hitting Continue.
+                    lifecycleScope.launch(Dispatchers.IO) {
+                        val meta = extractRecordingDate(this@VideoPickerActivity, videoUri)
+                        if (meta != null) withContext(Dispatchers.Main) {
+                            selectedDateMillis = meta
+                            updateDateDisplay()
+                        }
+                    }
+
                     Log.d("VideoPicker", "Video playback started")
                 } ?: run {
                     Log.e("VideoPicker", "URI is null - no video selected or permission denied")
@@ -135,10 +150,11 @@ class VideoPickerActivity : BaseActivity() {
 
         val datePickerDialog = DatePickerDialog(
             this,
+            R.style.Theme_GaitVision_DatePicker,
             { _, selectedYear, selectedMonth, selectedDay ->
                 val selectedCalendar = Calendar.getInstance().apply {
                     set(selectedYear, selectedMonth, selectedDay)
-                    // Normalize to start of day — time of day is not used by this app
+                    // normalize to start of day, app doesn't use time of day
                     set(Calendar.HOUR_OF_DAY, 0)
                     set(Calendar.MINUTE, 0)
                     set(Calendar.SECOND, 0)
@@ -154,6 +170,12 @@ class VideoPickerActivity : BaseActivity() {
         // Ensure user can't select future dates
         datePickerDialog.datePicker.maxDate = System.currentTimeMillis()
         datePickerDialog.show()
+        // Material's TextButton.Dialog uses a state-list selector for text
+        // color that ignores theme attrs, so just force white here.
+        val white = androidx.core.content.ContextCompat.getColor(this, R.color.text_white)
+        datePickerDialog.getButton(DatePickerDialog.BUTTON_POSITIVE)?.setTextColor(white)
+        datePickerDialog.getButton(DatePickerDialog.BUTTON_NEGATIVE)?.setTextColor(white)
+        datePickerDialog.getButton(DatePickerDialog.BUTTON_NEUTRAL)?.setTextColor(white)
     }
 
     private fun updateDateDisplay() {

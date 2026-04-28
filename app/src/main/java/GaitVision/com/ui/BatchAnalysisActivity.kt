@@ -375,28 +375,30 @@ class BatchAnalysisActivity : BaseActivity() {
             ?: row.recordedDateMillis
             ?: System.currentTimeMillis()
 
-        val outPath = "${cacheDir.absolutePath}/batch_${System.currentTimeMillis()}.mp4"
+        val tmpFile = withContext(Dispatchers.IO) {
+            File.createTempFile("batch", ".mp4", cacheDir)
+        }
 
-        AnalysisSession.editedUri = withContext(Dispatchers.IO) {
-            File(outPath).takeIf { it.exists() }?.delete()
-            ProcVidEmpty(this@BatchAnalysisActivity, outPath) { _, percent ->
-                runOnUiThread { barCurrent.progress = percent }
+        try {
+            AnalysisSession.editedUri = withContext(Dispatchers.IO) {
+                ProcVidEmpty(this@BatchAnalysisActivity, tmpFile.absolutePath) { _, percent ->
+                    runOnUiThread { barCurrent.progress = percent }
+                }
             }
-        }
 
-        if (AnalysisSession.extractedFeatures != null) {
-            persistCurrentSession(
-                context = this@BatchAnalysisActivity,
-                db = db,
-                patientId = patientId,
-                videoFileName = row.displayName,
-            )
-        } else {
-            throw IllegalStateException("no gait features extracted")
+            if (AnalysisSession.extractedFeatures != null) {
+                persistCurrentSession(
+                    context = this@BatchAnalysisActivity,
+                    db = db,
+                    patientId = patientId,
+                    videoFileName = row.displayName,
+                )
+            } else {
+                throw IllegalStateException("no gait features extracted")
+            }
+        } finally {
+            withContext(Dispatchers.IO) { tmpFile.delete() }
         }
-
-        // overlay file not needed in batch mode, clean up now
-        withContext(Dispatchers.IO) { File(outPath).takeIf { it.exists() }?.delete() }
     }
 
     private fun updateRow(index: Int, newRow: BatchVideoRow) {

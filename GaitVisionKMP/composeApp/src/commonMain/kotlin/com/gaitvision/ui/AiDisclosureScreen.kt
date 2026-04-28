@@ -101,13 +101,18 @@ fun AiDisclosureScreen(
             Button(
                 onClick = {
                     scope.launch {
-                        database.aiConsentDao().insertConsent(
-                            AiConsentEntity(
-                                patientId = patientId,
-                                consentGiven = true,
-                                consentTimestamp = Clock.System.now().toEpochMilliseconds()
+                        try {
+                            database.aiConsentDao().insertConsent(
+                                AiConsentEntity(
+                                    patientId = patientId,
+                                    consentGiven = true,
+                                    consentTimestamp = Clock.System.now().toEpochMilliseconds()
+                                )
                             )
-                        )
+                        } catch (e: Exception) {
+                            // Log but don't crash — proceed even if DB write fails on iOS
+                            println("AiDisclosureScreen: consent insert failed: ${e.message}")
+                        }
                         onConsentGranted()
                     }
                 },

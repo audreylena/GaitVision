@@ -17,12 +17,6 @@ import android.os.Build
 import android.net.Uri
 import android.util.Log
 import android.view.Surface
-import android.view.View
-import android.view.View.GONE
-import android.view.View.VISIBLE
-import android.widget.ProgressBar
-import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -45,6 +39,11 @@ import GaitVision.com.gait.GaitDiagnostics
 import GaitVision.com.gait.GaitScorer
 import GaitVision.com.gait.ScoringResult
 import GaitVision.com.gait.QualityFlag
+
+// stage is "processing", "retry", or "done". percent is 0..100 within that stage.
+// Lets the caller render progress however it wants (single-video bar, per-row
+// status in batch) without dragging view IDs into the pipeline.
+typealias ProgressReporter = (stage: String, percent: Int) -> Unit
 
 /**
  * Convert YUV_420_888 Image (from MediaCodec) to ARGB Bitmap.
@@ -281,17 +280,6 @@ fun releaseMediaPipeBackend() {
 
 
 /**
- * Hide progress UI elements after processing.
- */
-private suspend fun hideProgressUI(activity: AppCompatActivity) {
-    withContext(Dispatchers.Main) {
-        activity.findViewById<TextView>(R.id.SplittingText).visibility = GONE
-        activity.findViewById<ProgressBar>(R.id.splittingBar).visibility = GONE
-        activity.findViewById<TextView>(R.id.splittingProgressValue).visibility = GONE
-    }
-}
-
-/**
  * Holds mutable state for video encoding across frames.
  */
 private class EncoderState(
@@ -480,7 +468,11 @@ fun processFrameWithMediaPipe(
  * 8. If extraction fails (quality != OK), could retry with ROI
  * 9. Compute gait scores
  */
-suspend fun ProcVidEmpty(context: Context, outputPath: String, activity: AppCompatActivity): Uri? {
+suspend fun ProcVidEmpty(
+    context: Context,
+    outputPath: String,
+    onProgress: ProgressReporter? = null
+): Uri? {
     val TAG = "ImageProcessing"
     
     // Clear all data
@@ -496,19 +488,7 @@ suspend fun ProcVidEmpty(context: Context, outputPath: String, activity: AppComp
         return null
     }
 
-    // Setup UI - single progress bar for streaming
-    withContext(Dispatchers.Main) {
-        activity.findViewById<TextView>(R.id.SplittingText).text = "Processing..."
-        activity.findViewById<TextView>(R.id.SplittingText).visibility = VISIBLE
-        activity.findViewById<ProgressBar>(R.id.splittingBar).visibility = VISIBLE
-        activity.findViewById<ProgressBar>(R.id.splittingBar).progress = 0
-        activity.findViewById<TextView>(R.id.splittingProgressValue).visibility = VISIBLE
-        activity.findViewById<TextView>(R.id.splittingProgressValue).text = " 0%"
-        // Hide the second progress bar - we use only one now
-        activity.findViewById<TextView>(R.id.CreationText).visibility = GONE
-        activity.findViewById<ProgressBar>(R.id.VideoCreation).visibility = GONE
-        activity.findViewById<TextView>(R.id.CreatingProgressValue).visibility = GONE
-    }
+    onProgress?.invoke("processing", 0)
 
     // === Set up MediaExtractor for FAST video reading ===
     val extractor = MediaExtractor()
@@ -601,7 +581,7 @@ suspend fun ProcVidEmpty(context: Context, outputPath: String, activity: AppComp
         Log.e(TAG, "Falling back to slow getFrameAtTime method")
         extractor.release()
         // Fallback to slow method
-        return procVidEmptyFallback(context, outputPath, activity)
+        return procVidEmptyFallback(context, outputPath, onProgress)
     }
     
     // Initialize MediaPipe
@@ -646,9 +626,7 @@ suspend fun ProcVidEmpty(context: Context, outputPath: String, activity: AppComp
     Log.d(TAG, "FAST STREAMING: Processing ~$totalFrames frames with MediaCodec")
     Log.d(TAG, "GPU delegate: ${mediaPipeBackend?.isUsingGpu() ?: false}, CLAHE: $enableCLAHE")
 
-    // Cache view references and progress state to avoid repeated findViewById + unnecessary context switches
-    val progressBar = activity.findViewById<ProgressBar>(R.id.splittingBar)
-    val progressText = activity.findViewById<TextView>(R.id.splittingProgressValue)
+    // only fire the callback when the integer percent actually changes
     var lastProgress = -1
 
     // === FAST MediaCodec STREAMING LOOP ===
@@ -712,10 +690,7 @@ suspend fun ProcVidEmpty(context: Context, outputPath: String, activity: AppComp
                             val progress = ((frameIndex.toFloat() / totalFrames) * 100).toInt().coerceIn(0, 100)
                             if (progress != lastProgress) {
                                 lastProgress = progress
-                                withContext(Dispatchers.Main) {
-                                    progressBar.progress = progress
-                                    progressText.text = " $progress%"
-                                }
+                                onProgress?.invoke("processing", progress)
                             }
                         } else {
                             decoder.releaseOutputBuffer(outputBufferId, false)
@@ -739,13 +714,12 @@ suspend fun ProcVidEmpty(context: Context, outputPath: String, activity: AppComp
     extractor.release()
     releaseMediaPipeBackend()
 
-    // Hide progress UI
-    hideProgressUI(activity)
+    onProgress?.invoke("processing", 100)
 
     Log.d(TAG, "FAST STREAMING complete. Processed $frameIndex frames, ${AnalysisSession.poseFrames.size} poses detected")
     
     // Feature extraction (uses poseFrames which is small)
-    extractGaitFeatures(context, width, height, frameIndex, activity)
+    extractGaitFeatures(context, width, height, frameIndex, onProgress)
     
     // Free heavy memory now that processing is done
     val frameCount = AnalysisSession.poseFrames.size
@@ -762,6 +736,7 @@ suspend fun ProcVidEmpty(context: Context, outputPath: String, activity: AppComp
     Log.d(TAG, "Cleared frameList and poseFrames ($frameCount poses freed)")
     
     Log.d(TAG, "Pipeline complete")
+    onProgress?.invoke("done", 100)
 
     val outputFile = File(outputPath)
     val uri = FileProvider.getUriForFile(context, "${context.packageName}.provider", outputFile)
@@ -773,7 +748,11 @@ suspend fun ProcVidEmpty(context: Context, outputPath: String, activity: AppComp
  * Fallback video processing using slow getFrameAtTime() method.
  * Used if MediaCodec initialization fails.
  */
-private suspend fun procVidEmptyFallback(context: Context, outputPath: String, activity: AppCompatActivity): Uri? {
+private suspend fun procVidEmptyFallback(
+    context: Context,
+    outputPath: String,
+    onProgress: ProgressReporter? = null
+): Uri? {
     val TAG = "ImageProcessing"
     Log.w(TAG, "Using SLOW fallback method (getFrameAtTime)")
     
@@ -839,10 +818,7 @@ private suspend fun procVidEmptyFallback(context: Context, outputPath: String, a
         }
         
         val progress = ((currTimeUs.toDouble() / videoLengthUs) * 100).toInt().coerceIn(0, 100)
-        withContext(Dispatchers.Main) {
-            activity.findViewById<ProgressBar>(R.id.splittingBar).progress = progress
-            activity.findViewById<TextView>(R.id.splittingProgressValue).text = " $progress%"
-        }
+        onProgress?.invoke("processing", progress)
         
         currTimeUs += frameIntervalUs
     }
@@ -852,11 +828,12 @@ private suspend fun procVidEmptyFallback(context: Context, outputPath: String, a
     retriever.release()
     releaseMediaPipeBackend()
 
-    hideProgressUI(activity)
+    onProgress?.invoke("processing", 100)
 
-    extractGaitFeatures(context, width, height, frameIndex, activity)
+    extractGaitFeatures(context, width, height, frameIndex, onProgress)
 
     val outputFile = File(outputPath)
+    onProgress?.invoke("done", 100)
     return FileProvider.getUriForFile(context, "${context.packageName}.provider", outputFile)
 }
 
@@ -874,7 +851,7 @@ private suspend fun extractGaitFeatures(
     frameWidth: Int, 
     frameHeight: Int, 
     totalFrames: Int,
-    activity: AppCompatActivity
+    onProgress: ProgressReporter? = null
 ) {
     Log.d("ImageProcessing", "Starting feature extraction with ${AnalysisSession.poseFrames.size} pose frames")
 
@@ -912,15 +889,9 @@ private suspend fun extractGaitFeatures(
         // If first pass failed and ROI retry is enabled, reprocess with ROI tracking
         if (features == null && enableROIRetry && diagnostics.qualityFlag != QualityFlag.OK) {
             Log.d("ImageProcessing", "First pass: ${diagnostics.qualityFlag} - retrying with ROI tracking...")
+            onProgress?.invoke("retry", 0)
             
-            // Update UI to show ROI retry in progress
-            withContext(Dispatchers.Main) {
-                activity.findViewById<TextView>(R.id.CreationText).text = "Retrying with ROI tracking..."
-                activity.findViewById<ProgressBar>(R.id.VideoCreation).progress = 0
-                activity.findViewById<TextView>(R.id.CreatingProgressValue).text = " 0%"
-            }
-            
-            val roiResult = reprocessWithRoiTracking(context, frameWidth, frameHeight, totalFrames, fps, activity)
+            val roiResult = reprocessWithRoiTracking(context, frameWidth, frameHeight, totalFrames, fps, onProgress)
             if (roiResult != null) {
                 val (roiPoseSequence, roiFrames) = roiResult
                 val normalizedRoiSeq = featureExtractor.normalizeDirection(roiPoseSequence)
@@ -938,12 +909,7 @@ private suspend fun extractGaitFeatures(
                 }
             }
             
-            // Update UI to show completion
-            withContext(Dispatchers.Main) {
-                activity.findViewById<TextView>(R.id.CreationText).text = "Processing Complete"
-                activity.findViewById<ProgressBar>(R.id.VideoCreation).progress = 100
-                activity.findViewById<TextView>(R.id.CreatingProgressValue).text = " 100%"
-            }
+            onProgress?.invoke("retry", 100)
         }
         
         AnalysisSession.extractedFeatures = features
@@ -1000,7 +966,7 @@ private suspend fun reprocessWithRoiTracking(
     frameHeight: Int,
     totalFrames: Int,
     fps: Float,
-    activity: AppCompatActivity
+    onProgress: ProgressReporter? = null
 ): Pair<PoseSequence, List<PoseFrame>>? {
     // BUG: frameList is always empty in fast path - see docstring above
     if (AnalysisSession.frameList.isEmpty()) return null
@@ -1016,12 +982,8 @@ private suspend fun reprocessWithRoiTracking(
     Log.d("ImageProcessing", "Reprocessing ${AnalysisSession.frameList.size} frames with ROI tracking...")
     
     for ((frameIndex, frame) in AnalysisSession.frameList.withIndex()) {
-        // Update progress UI
         val progress = ((frameIndex + 1) * 100 / listSize)
-        withContext(Dispatchers.Main) {
-            activity.findViewById<ProgressBar>(R.id.VideoCreation).progress = progress
-            activity.findViewById<TextView>(R.id.CreatingProgressValue).text = " $progress%"
-        }
+        onProgress?.invoke("retry", progress)
         val timestampMs = (frameIndex * 1000L / fps).toLong()
         
         // Determine processing region based on ROI state machine

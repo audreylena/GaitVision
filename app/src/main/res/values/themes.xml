@@ -26,6 +26,27 @@
         <item name="android:windowExitAnimation">@anim/slide_out</item>
     </style>
 
+    <!-- Date picker dialog: dark surface to match the app. Calendar digits
+         use white via colorOnSurface; selected-day chip uses the app's light
+         blue accent with a dark digit inside (colorOnPrimary).
+         OK/Cancel button text is forced white in code (see VideoPickerActivity)
+         because Material's TextButton.Dialog sets textColor via a selector
+         that ignores colorPrimary. -->
+    <style name="Theme.GaitVision.DatePicker" parent="Theme.MaterialComponents.Dialog">
+        <item name="colorPrimary">@color/icon_light_blue</item>
+        <item name="colorAccent">@color/icon_light_blue</item>
+        <item name="colorOnPrimary">@color/text_primary</item>
+        <item name="colorControlActivated">@color/icon_light_blue</item>
+        <item name="colorControlNormal">@color/text_white</item>
+        <item name="colorControlHighlight">#33FFFFFF</item>
+        <item name="colorOnSurface">@color/text_white</item>
+        <item name="android:textColorPrimary">@color/text_white</item>
+        <item name="android:textColorSecondary">#CCCCCC</item>
+        <item name="android:textColorPrimaryInverse">@color/text_primary</item>
+        <item name="android:windowBackground">@color/card_surface_dark</item>
+        <item name="android:colorBackground">@color/card_surface_dark</item>
+    </style>
+
     <!-- Common UI Styles -->
 
     <!-- Activity Container -->

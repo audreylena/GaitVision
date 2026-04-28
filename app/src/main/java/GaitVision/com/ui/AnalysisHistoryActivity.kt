@@ -88,7 +88,8 @@ class AnalysisHistoryActivity : BaseActivity() {
 
         if (patientIdArg <= 0) { finish(); return }
 
-        setupCommonHeader("Analysis History — $patientName")
+        setupCommonHeader("Analysis History")
+        setHeaderSubtitle(patientName)
 
         analysisResultDao = AppDatabase.getDatabase(this).analysisResultDao()
 

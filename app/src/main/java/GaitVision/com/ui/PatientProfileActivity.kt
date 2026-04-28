@@ -101,6 +101,9 @@ class PatientProfileActivity : BaseActivity() {
         findViewById<LinearLayout>(R.id.btnNewAnalysis).setOnClickListener {
             startNewAnalysis()
         }
+        findViewById<LinearLayout>(R.id.btnBatchAnalysis).setOnClickListener {
+            startBatchAnalysis()
+        }
         findViewById<LinearLayout>(R.id.btnViewHistory).setOnClickListener {
             openAnalysisHistory()
         }
@@ -288,6 +291,13 @@ class PatientProfileActivity : BaseActivity() {
             intent.putExtra("fromPatientProfile", true)
             startActivity(intent)
         }
+    }
+
+    private fun startBatchAnalysis() {
+        val patient = currentPatient ?: return
+        val intent = Intent(this, BatchAnalysisActivity::class.java)
+        intent.putExtra(BatchAnalysisActivity.EXTRA_PATIENT_ID, patient.participantId ?: patientIdArg)
+        startActivity(intent)
     }
 
     private fun showDeleteConfirmation() {

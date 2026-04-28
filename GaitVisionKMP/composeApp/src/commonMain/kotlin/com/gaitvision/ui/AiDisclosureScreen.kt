@@ -7,7 +7,6 @@ import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -25,7 +24,7 @@ fun AiDisclosureScreen(
     onConsentGranted: () -> Unit,
     onDecline: () -> Unit
 ) {
-    val scope = rememberCoroutineScope()
+    val scope = rememberSafeCoroutineScope()
 
     Scaffold(
         topBar = {
@@ -100,21 +99,22 @@ fun AiDisclosureScreen(
 
             Button(
                 onClick = {
-                    scope.launch {
-                        try {
-                            database.aiConsentDao().insertConsent(
-                                AiConsentEntity(
-                                    patientId = patientId,
-                                    consentGiven = true,
-                                    consentTimestamp = Clock.System.now().toEpochMilliseconds()
+                    if (patientId != 0L) {
+                        scope.launch {
+                            try {
+                                database.aiConsentDao().insertConsent(
+                                    AiConsentEntity(
+                                        patientId = patientId,
+                                        consentGiven = true,
+                                        consentTimestamp = Clock.System.now().toEpochMilliseconds()
+                                    )
                                 )
-                            )
-                        } catch (e: Exception) {
-                            // Log but don't crash — proceed even if DB write fails on iOS
-                            println("AiDisclosureScreen: consent insert failed: ${e.message}")
+                            } catch (e: Exception) {
+                                println("AiDisclosureScreen: consent insert failed: ${e.message}")
+                            }
                         }
-                        onConsentGranted()
                     }
+                    onConsentGranted()
                 },
                 modifier = Modifier
                     .fillMaxWidth()

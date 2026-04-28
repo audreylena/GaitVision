@@ -36,7 +36,7 @@ fun PatientCreateScreen(
     var notes by remember { mutableStateOf("") }
     var biologicalSex by remember { mutableStateOf("") }
     var errorMsg by remember { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
+    val scope = rememberSafeCoroutineScope()
 
     Scaffold(
         topBar = {
@@ -212,18 +212,22 @@ fun PatientCreateScreen(
                                 errorMsg = "Please fill in all required fields"
                             } else {
                                 scope.launch {
-                                    val totalHeight = (heightFeet.toIntOrNull() ?: 0) * 12 + (heightInches.toIntOrNull() ?: 0)
-                                    database.patientDao().insertPatient(
-                                        com.gaitvision.data.PatientEntity(
-                                            firstName = firstName.trim(),
-                                            lastName = lastName.trim(),
-                                            age = age.toIntOrNull(),
-                                            biologicalSex = biologicalSex,
-                                            height = totalHeight,
-                                            createdAt = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
+                                    try {
+                                        val totalHeight = (heightFeet.toIntOrNull() ?: 0) * 12 + (heightInches.toIntOrNull() ?: 0)
+                                        database.patientDao().insertPatient(
+                                            com.gaitvision.data.PatientEntity(
+                                                firstName = firstName.trim(),
+                                                lastName = lastName.trim(),
+                                                age = age.toIntOrNull(),
+                                                biologicalSex = biologicalSex,
+                                                height = totalHeight,
+                                                createdAt = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
+                                            )
                                         )
-                                    )
-                                    onPatientCreated()
+                                        onPatientCreated()
+                                    } catch (e: Exception) {
+                                        println("PatientCreateScreen: insert failed: ${e.message}")
+                                    }
                                 }
                             }
                         }.padding(16.dp),
@@ -240,18 +244,22 @@ fun PatientCreateScreen(
                                 errorMsg = "Please fill in all required fields"
                             } else {
                                 scope.launch {
-                                    val totalHeight = (heightFeet.toIntOrNull() ?: 0) * 12 + (heightInches.toIntOrNull() ?: 0)
-                                    val newPatientId = database.patientDao().insertPatient(
-                                        com.gaitvision.data.PatientEntity(
-                                            firstName = firstName.trim(),
-                                            lastName = lastName.trim(),
-                                            age = age.toIntOrNull(),
-                                            biologicalSex = biologicalSex,
-                                            height = totalHeight,
-                                            createdAt = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
+                                    try {
+                                        val totalHeight = (heightFeet.toIntOrNull() ?: 0) * 12 + (heightInches.toIntOrNull() ?: 0)
+                                        val newPatientId = database.patientDao().insertPatient(
+                                            com.gaitvision.data.PatientEntity(
+                                                firstName = firstName.trim(),
+                                                lastName = lastName.trim(),
+                                                age = age.toIntOrNull(),
+                                                biologicalSex = biologicalSex,
+                                                height = totalHeight,
+                                                createdAt = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
+                                            )
                                         )
-                                    )
-                                    onNavigateToCamera(newPatientId)
+                                        onNavigateToCamera(newPatientId)
+                                    } catch (e: Exception) {
+                                        println("PatientCreateScreen: insert+navigate failed: ${e.message}")
+                                    }
                                 }
                             }
                         }.padding(16.dp),

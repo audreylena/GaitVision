@@ -1,7 +1,6 @@
 package com.gaitvision.ui
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -43,14 +42,19 @@ fun AppNavigation(
     database: AppDatabase,
     navController: NavHostController = rememberNavController()
 ) {
-    val scope = rememberCoroutineScope()
+    val scope = rememberSafeCoroutineScope()
 
     val navigateToCameraOrConsent: (Long) -> Unit = { patientId ->
         scope.launch {
-            val consent = database.aiConsentDao().getConsentForPatient(patientId)
-            if (consent != null && consent.consentGiven) {
-                navController.navigate(Screen.createCameraRoute(patientId))
-            } else {
+            try {
+                val consent = database.aiConsentDao().getConsentForPatient(patientId)
+                if (consent != null && consent.consentGiven) {
+                    navController.navigate(Screen.createCameraRoute(patientId))
+                } else {
+                    navController.navigate(Screen.createAiDisclosureRoute(patientId))
+                }
+            } catch (e: Exception) {
+                println("Navigation: consent check failed, showing disclosure: ${e.message}")
                 navController.navigate(Screen.createAiDisclosureRoute(patientId))
             }
         }

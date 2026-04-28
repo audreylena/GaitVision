@@ -37,11 +37,15 @@ fun ResultsScreen(
 ) {
     var scoreEntity by remember { mutableStateOf<GaitScoreEntity?>(null) }
     var reviewEntity by remember { mutableStateOf<ClinicianReviewEntity?>(null) }
-    val scope = rememberCoroutineScope()
+    val scope = rememberSafeCoroutineScope()
     LaunchedEffect(scoreId) {
-        scoreEntity = database.gaitScoreDao().getScoreById(scoreId)
-        reviewEntity = database.clinicianReviewDao().getReviewForScore(scoreId)
-        AuditLogger.log(database.auditLogDao(), "VIEW_RESULTS", recordId = scoreId)
+        try {
+            scoreEntity = database.gaitScoreDao().getScoreById(scoreId)
+            reviewEntity = database.clinicianReviewDao().getReviewForScore(scoreId)
+            AuditLogger.log(database.auditLogDao(), "VIEW_RESULTS", recordId = scoreId)
+        } catch (e: Exception) {
+            println("ResultsScreen: load failed: ${e.message}")
+        }
     }
 
     Scaffold(
@@ -140,13 +144,17 @@ fun ResultsScreen(
                         Button(
                             onClick = {
                                 scope.launch {
-                                    val review = ClinicianReviewEntity(
-                                        gaitScoreId = scoreId,
-                                        isReviewed = true,
-                                        reviewTimestamp = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
-                                    )
-                                    database.clinicianReviewDao().insertReview(review)
-                                    reviewEntity = review
+                                    try {
+                                        val review = ClinicianReviewEntity(
+                                            gaitScoreId = scoreId,
+                                            isReviewed = true,
+                                            reviewTimestamp = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
+                                        )
+                                        database.clinicianReviewDao().insertReview(review)
+                                        reviewEntity = review
+                                    } catch (e: Exception) {
+                                        println("ResultsScreen: review insert failed: ${e.message}")
+                                    }
                                 }
                             },
                             modifier = Modifier.fillMaxWidth(),

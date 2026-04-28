@@ -27,7 +27,7 @@ fun CsvScreen(
     onNavigateBack: () -> Unit
 ) {
     val csvSharer = rememberCsvSharer()
-    val scope = rememberCoroutineScope()
+    val scope = rememberSafeCoroutineScope()
 
     var currentScoreId by remember { mutableStateOf<Long?>(null) }
 
@@ -177,12 +177,16 @@ fun CsvScreen(
                                 exportStatus = "Saved: $filename"
                                 csvSharer.shareCsv(path)
                                 scope.launch {
-                                    AuditLogger.log(
-                                        database.auditLogDao(),
-                                        "EXPORT_CSV",
-                                        patientId = null,
-                                        recordId = currentScoreId
-                                    )
+                                    try {
+                                        AuditLogger.log(
+                                            database.auditLogDao(),
+                                            "EXPORT_CSV",
+                                            patientId = null,
+                                            recordId = currentScoreId
+                                        )
+                                    } catch (e: Exception) {
+                                        println("CsvScreen: audit log failed: ${e.message}")
+                                    }
                                 }
                             } else {
                                 exportSuccess = false

@@ -40,8 +40,12 @@ fun PatientProfileScreen(
         .collectAsState(initial = emptyList())
 
     LaunchedEffect(patientId) {
-        patient = database.patientDao().getPatientById(patientId)
-        AuditLogger.log(database.auditLogDao(), "VIEW_PATIENT", patientId = patientId)
+        try {
+            patient = database.patientDao().getPatientById(patientId)
+            AuditLogger.log(database.auditLogDao(), "VIEW_PATIENT", patientId = patientId)
+        } catch (e: Exception) {
+            println("PatientProfileScreen: load failed: ${e.message}")
+        }
     }
 
     if (patient == null) {

@@ -74,7 +74,11 @@ private class CameraViewController(
     private val captureSession = AVCaptureSession()
     var previewLayer: AVCaptureVideoPreviewLayer? = null
     private val cameraQueue = dispatch_queue_create("cameraQueue", null)
-    private val scope = CoroutineScope(Dispatchers.Main)
+    private val scope = CoroutineScope(
+        Dispatchers.Main + CoroutineExceptionHandler { _, throwable ->
+            println("CameraViewController: Caught unhandled exception: ${throwable::class.simpleName}: ${throwable.message}")
+        }
+    )
 
     override fun viewDidLoad() {
         super.viewDidLoad()
@@ -143,12 +147,16 @@ private class CameraViewController(
         // Since detectPose is suspend, we need a scope.
         
         scope.launch(Dispatchers.Default) {
-             val pose = poseDetector.detectPose(pixelBuffer)
-             if (pose != null) {
-                 dispatch_async(dispatch_get_main_queue()) {
-                     onPoseDetected(pose)
-                 }
-             }
+            try {
+                val pose = poseDetector.detectPose(pixelBuffer)
+                if (pose != null) {
+                    dispatch_async(dispatch_get_main_queue()) {
+                        onPoseDetected(pose)
+                    }
+                }
+            } catch (e: Exception) {
+                println("CameraPreview: pose detection failed: ${e.message}")
+            }
         }
     }
 }

@@ -44,7 +44,7 @@ fun CameraScreen(
     videoProcessor: VideoProcessor,
     database: AppDatabase
 ) {
-    val scope = rememberCoroutineScope()
+    val scope = rememberSafeCoroutineScope()
     var mode by remember { mutableStateOf(CameraScreenMode.SELECTION) }
     
     var pose by remember { mutableStateOf<Pose?>(null) }
@@ -60,15 +60,8 @@ fun CameraScreen(
     var patientBiologicalSex by remember { mutableStateOf("") }
     
     LaunchedEffect(patientId) {
-        if (patientId == 0L) {
-            // Find or create 'Quick Analysis' patient
-            scope.launch {
-                val patients = database.patientDao().getAllPatientsFlow() // this is flow, let's use a query
-                // Instead of flow, let's just create a new one every time or find by special tag
-                // For simplicity, let's just use 0 as a special case in Daos if we can, 
-                // but schema has FK. So we MUST have a real patient.
-                
-                // Let's create one called "Quick Analysis"
+        try {
+            if (patientId == 0L) {
                 val qid = database.patientDao().insertPatient(
                     PatientEntity(
                         firstName = "Quick",
@@ -78,10 +71,12 @@ fun CameraScreen(
                     )
                 )
                 resolvedPatientId = qid
+            } else {
+                val p = database.patientDao().getPatientById(patientId)
+                patientBiologicalSex = p?.biologicalSex ?: ""
             }
-        } else {
-            val p = database.patientDao().getPatientById(patientId)
-            patientBiologicalSex = p?.biologicalSex ?: ""
+        } catch (e: Exception) {
+            println("CameraScreen: patient setup failed: ${e.message}")
         }
     }
 

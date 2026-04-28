@@ -23,6 +23,7 @@ class IOSVideoProcessor : VideoProcessor {
         onProgress: (Int) -> Unit,
         onPoseDetected: (Pose) -> Unit
     ): String? = withContext(Dispatchers.Default) {
+        try {
         val inputUrl = NSURL.fileURLWithPath(inputPath)
         val outputUrl = NSURL.fileURLWithPath(outputPath)
         
@@ -134,6 +135,10 @@ class IOSVideoProcessor : VideoProcessor {
         }
         
         return@withContext outputPath
+        } catch (e: Exception) {
+            println("IosVideoProcessor: processVideo failed: ${e.message}")
+            return@withContext null
+        }
     }
 
     private fun createBitmapContext(pixelBuffer: CVPixelBufferRef): CGContextRef? {

@@ -43,7 +43,7 @@ fun DashboardScreen(
     onNavigateToInfo: () -> Unit = {},
     onNavigateToCreatePatient: () -> Unit = {}
 ) {
-    val scope = rememberCoroutineScope()
+    val scope = rememberSafeCoroutineScope()
     val analyzer = remember { GaitAnalyzer() }
     var isProcessing by remember { mutableStateOf(false) }
     var progress by remember { mutableStateOf(0) }

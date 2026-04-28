@@ -1,5 +1,7 @@
 # GaitVision KMP: iOS Setup and Run Guide
 
+**[Tutorial video for building the app on IOS](https://drive.google.com/file/d/1Cofk2mKRMbdzHe6a7a2fWndDKmxGuuBc/view?usp=drive_link)**
+
 This guide provides step-by-step instructions for running the GaitVision Kotlin Multiplatform (KMP) application on iOS. You must be on a macOS environment to compile and run the iOS target.
 
 ## Prerequisites

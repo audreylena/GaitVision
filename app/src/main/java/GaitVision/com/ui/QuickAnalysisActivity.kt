@@ -36,21 +36,11 @@ class QuickAnalysisActivity : BaseActivity() {
     }
 
     private fun setupButtons() {
-        findViewById<LinearLayout>(R.id.btnRecord).setOnClickListener {
+        findViewById<LinearLayout>(R.id.btnContinue).setOnClickListener {
             if (validateAndSaveInputs()) {
-                val intent = Intent(this, VideoPickerActivity::class.java)
-                intent.putExtra("mode", "record")
-                intent.putExtra(AnalysisActivity.EXTRA_SHOULD_SAVE, false)
-                startActivity(intent)
-            }
-        }
-
-        findViewById<LinearLayout>(R.id.btnSelect).setOnClickListener {
-            if (validateAndSaveInputs()) {
-                val intent = Intent(this, VideoPickerActivity::class.java)
-                intent.putExtra("mode", "gallery")
-                intent.putExtra(AnalysisActivity.EXTRA_SHOULD_SAVE, false)
-                startActivity(intent)
+                startActivity(Intent(this, VideoPickerActivity::class.java).apply {
+                    putExtra(AnalysisActivity.EXTRA_SHOULD_SAVE, false)
+                })
             }
         }
 

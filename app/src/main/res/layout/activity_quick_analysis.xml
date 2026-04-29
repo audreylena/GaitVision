@@ -74,24 +74,24 @@
 
         <!-- Continue to video picker -->
         <androidx.cardview.widget.CardView
+            android:id="@+id/btnContinue"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
+            android:foreground="?attr/selectableItemBackground"
+            android:focusable="true"
+            android:clickable="true"
             app:cardCornerRadius="16dp"
             app:cardBackgroundColor="@color/card_surface_dark"
             app:cardElevation="3dp">
 
             <LinearLayout
-                android:id="@+id/btnContinue"
                 android:layout_width="match_parent"
                 android:layout_height="56dp"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
                 android:paddingStart="20dp"
-                android:paddingEnd="20dp"
-                android:background="?attr/selectableItemBackground"
-                android:focusable="true"
-                android:clickable="true">
+                android:paddingEnd="20dp">
 
                 <ImageView
                     android:layout_width="22dp"

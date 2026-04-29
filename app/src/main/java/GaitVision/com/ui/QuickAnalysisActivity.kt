@@ -2,7 +2,7 @@ package GaitVision.com.ui
 
 import android.content.Intent
 import android.os.Bundle
-import android.widget.LinearLayout
+import android.view.View
 import android.widget.EditText
 import GaitVision.com.R
 import GaitVision.com.AnalysisSession
@@ -11,6 +11,8 @@ class QuickAnalysisActivity : BaseActivity() {
 
     private lateinit var etFeet: EditText
     private lateinit var etInches: EditText
+    private lateinit var btnContinue: View
+    private lateinit var btnViewResults: View
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -29,14 +31,15 @@ class QuickAnalysisActivity : BaseActivity() {
     private fun initializeViews() {
         etFeet = findViewById(R.id.etFeet)
         etInches = findViewById(R.id.etInches)
+        btnContinue = findViewById(R.id.btnContinue)
+        btnViewResults = findViewById(R.id.btnViewResults)
 
-        // Set default height values
         etFeet.setText("5")
         etInches.setText("9")
     }
 
     private fun setupButtons() {
-        findViewById<LinearLayout>(R.id.btnContinue).setOnClickListener {
+        btnContinue.setOnClickListener {
             if (validateAndSaveInputs()) {
                 startActivity(Intent(this, VideoPickerActivity::class.java).apply {
                     putExtra(AnalysisActivity.EXTRA_SHOULD_SAVE, false)
@@ -44,7 +47,7 @@ class QuickAnalysisActivity : BaseActivity() {
             }
         }
 
-        findViewById<LinearLayout>(R.id.btnViewResults).setOnClickListener {
+        btnViewResults.setOnClickListener {
             startActivity(Intent(this, ResultsActivity::class.java))
         }
     }

@@ -21,6 +21,7 @@ import GaitVision.com.gait.*
 class ResultsActivity : BaseActivity() {
 
     companion object {
+        private const val KEY_PROFESSIONALLY_REVIEWED = "professionally_reviewed"
         const val EXTRA_RESULT_ID = "result_id"
     }
 
@@ -33,13 +34,15 @@ class ResultsActivity : BaseActivity() {
     private var calculatedScore: Double = 0.0
     private var resultId: Long = -1L
     private var isProfessionallyReviewed = false
-
+    
+    // Local state to avoid race conditions with singleton AnalysisSession
     private var localFeatures: GaitFeatures? = null
     private var localDiagnostics: GaitDiagnostics? = null
     private var localScore: ScoringResult? = null
     private var localParticipantId: Int = 0
     private var localVideoUri: Uri? = null
-
+    
+    /** SAF file picker for CSV export -- user chooses save location */
     private val csvExportLauncher = registerForActivityResult(
         ActivityResultContracts.CreateDocument("text/csv")
     ) { uri -> uri?.let { writeCsvToUri(it) } }
@@ -47,6 +50,8 @@ class ResultsActivity : BaseActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_results)
+
+        isProfessionallyReviewed = savedInstanceState?.getBoolean(KEY_PROFESSIONALLY_REVIEWED) ?: false
 
         setupCommonHeader("Analysis Results")
         initializeViews()
@@ -57,6 +62,8 @@ class ResultsActivity : BaseActivity() {
         if (resultId > 0) {
             loadFromDatabase(resultId)
         } else {
+            // Copy from global session to local state (Live analysis path)
+            // We copy immediately so if a new analysis starts in bg, we hold onto these results
             localFeatures = AnalysisSession.extractedFeatures
             localDiagnostics = AnalysisSession.extractionDiagnostics
             localScore = AnalysisSession.scoringResult
@@ -316,5 +323,10 @@ class ResultsActivity : BaseActivity() {
             Log.e("ResultsActivity", "Error exporting: ${e.message}", e)
             Toast.makeText(this, "Error exporting: ${e.message}", Toast.LENGTH_LONG).show()
         }
+         
     }
+override fun onSaveInstanceState(outState: Bundle) {
+    super.onSaveInstanceState(outState)
+    outState.putBoolean(KEY_PROFESSIONALLY_REVIEWED, isProfessionallyReviewed)
 }
+} 

@@ -14,7 +14,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import GaitVision.com.R
-import GaitVision.com.data.AnalysisResult
 import GaitVision.com.data.AppDatabase
 import GaitVision.com.AnalysisSession
 import GaitVision.com.gait.*
@@ -22,6 +21,7 @@ import GaitVision.com.gait.*
 class ResultsActivity : BaseActivity() {
 
     companion object {
+        private const val KEY_PROFESSIONALLY_REVIEWED = "professionally_reviewed"
         const val EXTRA_RESULT_ID = "result_id"
     }
 
@@ -33,14 +33,15 @@ class ResultsActivity : BaseActivity() {
 
     private var calculatedScore: Double = 0.0
     private var resultId: Long = -1L
-
+    private var isProfessionallyReviewed = false
+    
     // Local state to avoid race conditions with singleton AnalysisSession
     private var localFeatures: GaitFeatures? = null
     private var localDiagnostics: GaitDiagnostics? = null
     private var localScore: ScoringResult? = null
     private var localParticipantId: Int = 0
     private var localVideoUri: Uri? = null
-
+    
     /** SAF file picker for CSV export -- user chooses save location */
     private val csvExportLauncher = registerForActivityResult(
         ActivityResultContracts.CreateDocument("text/csv")
@@ -50,6 +51,8 @@ class ResultsActivity : BaseActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_results)
 
+        isProfessionallyReviewed = savedInstanceState?.getBoolean(KEY_PROFESSIONALLY_REVIEWED) ?: false
+
         setupCommonHeader("Analysis Results")
         initializeViews()
         setupButtons()
@@ -57,7 +60,6 @@ class ResultsActivity : BaseActivity() {
         resultId = intent.getLongExtra(EXTRA_RESULT_ID, -1L)
 
         if (resultId > 0) {
-            // Load from DB into local state
             loadFromDatabase(resultId)
         } else {
             // Copy from global session to local state (Live analysis path)
@@ -67,7 +69,7 @@ class ResultsActivity : BaseActivity() {
             localScore = AnalysisSession.scoringResult
             localParticipantId = AnalysisSession.participantId
             localVideoUri = AnalysisSession.galleryUri
-            
+
             calculateGaitScore()
         }
     }
@@ -82,6 +84,11 @@ class ResultsActivity : BaseActivity() {
 
     private fun setupButtons() {
         findViewById<LinearLayout>(R.id.btnExportCsv).setOnClickListener {
+            if (!isProfessionallyReviewed) {
+                showReviewDialog()
+                return@setOnClickListener
+            }
+
             exportCsvFiles()
         }
 
@@ -96,10 +103,18 @@ class ResultsActivity : BaseActivity() {
         }
     }
 
-    /**
-     * Load an AnalysisResult from DB and populate local variables.
-     * Does NOT touch AnalysisSession globals, preventing race conditions.
-     */
+    private fun showReviewDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("Professional Review Required")
+            .setMessage("These results are AI-assisted and should be reviewed by a qualified professional before export.")
+            .setPositiveButton("Confirm Review") { _, _ ->
+                isProfessionallyReviewed = true
+                exportCsvFiles()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
     private fun loadFromDatabase(id: Long) {
         lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) {
@@ -112,7 +127,6 @@ class ResultsActivity : BaseActivity() {
                 return@launch
             }
 
-            // Populate local state
             localFeatures = GaitFeatures(
                 cadence_spm = result.cadenceSpm ?: Float.NaN,
                 stride_time_s = result.strideTimeS ?: Float.NaN,
@@ -151,12 +165,15 @@ class ResultsActivity : BaseActivity() {
                 estimatedCadenceSpm = result.cadenceSpm ?: 0f,
                 walkingDirection = result.walkingDirection ?: "unknown",
                 wasFlipped = result.wasFlipped,
-                qualityFlag = try { QualityFlag.valueOf(result.qualityFlag ?: "OK") } catch (_: Exception) { QualityFlag.OK }
+                qualityFlag = try {
+                    QualityFlag.valueOf(result.qualityFlag ?: "OK")
+                } catch (_: Exception) {
+                    QualityFlag.OK
+                }
             )
 
             localParticipantId = result.patientId
-            // We don't have the original URI for history items usually, checking if we can get it from videoFileName isn't reliable for URI
-            localVideoUri = null 
+            localVideoUri = null
 
             calculateGaitScore()
         }
@@ -170,7 +187,8 @@ class ResultsActivity : BaseActivity() {
         if (pcFeatures != null && pcScore != null && pcFeatures.valid_stride_count > 0) {
             calculatedScore = pcScore.getScoreForDatabase()
             tvGaitScore.text = calculatedScore.toLong().toString()
-            tvScoreLabel.text = "${getScoreLabel(calculatedScore)}\n(${pcFeatures.valid_stride_count} strides, ${String.format("%.1f", pcFeatures.cadence_spm)} spm)"
+            tvScoreLabel.text =
+                "${getScoreLabel(calculatedScore)}\n(${pcFeatures.valid_stride_count} strides, ${String.format("%.1f", pcFeatures.cadence_spm)} spm)"
 
             tvAeScore.text = if (!pcScore.aeScore.isNaN()) pcScore.aeScore.toLong().toString() else "--"
             tvRidgeScore.text = if (!pcScore.ridgeScore.isNaN()) pcScore.ridgeScore.toLong().toString() else "--"
@@ -200,6 +218,7 @@ class ResultsActivity : BaseActivity() {
                 pcScore == null -> "Scoring failed to initialize"
                 else -> "Unknown error"
             }
+
             tvScoreLabel.text = errorMsg
             tvGaitScore.setTextColor(android.graphics.Color.parseColor("#F44336"))
         }
@@ -264,7 +283,8 @@ class ResultsActivity : BaseActivity() {
         }
 
         val filePrefix = if (localParticipantId == 0) {
-            val timestamp = java.text.SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", java.util.Locale.US).format(java.util.Date())
+            val timestamp = java.text.SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", java.util.Locale.US)
+                .format(java.util.Date())
             "${timestamp}_0"
         } else {
             localParticipantId.toString()
@@ -280,6 +300,7 @@ class ResultsActivity : BaseActivity() {
             val videoName = localVideoUri?.lastPathSegment
                 ?: diagnostics.videoId.takeIf { it.isNotBlank() }
                 ?: "unknown"
+
             val filePrefix = if (localParticipantId == 0) "0" else localParticipantId.toString()
 
             contentResolver.openOutputStream(uri)?.use { stream ->
@@ -291,6 +312,7 @@ class ResultsActivity : BaseActivity() {
                     participantId = filePrefix,
                     videoName = videoName
                 )
+
                 if (success) {
                     Toast.makeText(this, "CSV exported successfully", Toast.LENGTH_SHORT).show()
                 } else {
@@ -301,5 +323,10 @@ class ResultsActivity : BaseActivity() {
             Log.e("ResultsActivity", "Error exporting: ${e.message}", e)
             Toast.makeText(this, "Error exporting: ${e.message}", Toast.LENGTH_LONG).show()
         }
+         
     }
+override fun onSaveInstanceState(outState: Bundle) {
+    super.onSaveInstanceState(outState)
+    outState.putBoolean(KEY_PROFESSIONALLY_REVIEWED, isProfessionallyReviewed)
 }
+} 

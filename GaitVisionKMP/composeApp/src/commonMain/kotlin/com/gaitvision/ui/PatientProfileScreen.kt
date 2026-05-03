@@ -2,7 +2,6 @@ package com.gaitvision.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -32,6 +31,7 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -42,13 +42,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.runtime.LaunchedEffect
 import com.gaitvision.data.AppDatabase
 import com.gaitvision.data.AuditLogger
 import com.gaitvision.data.GaitScoreEntity
 import com.gaitvision.data.PatientEntity
+import kotlinx.coroutines.launch
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -59,12 +60,17 @@ fun PatientProfileScreen(
     database: AppDatabase,
     onNavigateBack: () -> Unit,
     onNavigateToResults: (Long) -> Unit,
-    onNavigateToCamera: () -> Unit = {}
+    onNavigateToCamera: () -> Unit = {},
+    onNavigateToBatchAnalysis: () -> Unit = {},
+    onNavigateToAnalysisHistory: () -> Unit = {},
+    onNavigateToProgressOverTime: () -> Unit = {},
+    onNavigateToEditPatient: () -> Unit = {}
 ) {
+    val scope = rememberSafeCoroutineScope()
     var patient by remember { mutableStateOf<PatientEntity?>(null) }
     val scoresWithReviews by database.gaitScoreDao().getScoresWithReviewsForPatientFlow(patientId)
         .collectAsState(initial = emptyList())
-    var showHistoryDialog by remember { mutableStateOf(false) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(patientId) {
         try {
@@ -73,6 +79,42 @@ fun PatientProfileScreen(
         } catch (e: Exception) {
             println("PatientProfileScreen: load failed: ${e.message}")
         }
+    }
+
+    if (showDeleteDialog && patient != null) {
+        val pDel = patient!!
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("Delete Patient") },
+            text = {
+                Text(
+                    "Are you sure you want to delete this patient and all their analysis data? This cannot be undone."
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteDialog = false
+                        scope.launch {
+                            try {
+                                database.patientDao().deletePatient(pDel)
+                                AuditLogger.log(
+                                    database.auditLogDao(),
+                                    "DELETE_PATIENT",
+                                    patientId = patientId
+                                )
+                                onNavigateBack()
+                            } catch (e: Exception) {
+                                println("PatientProfileScreen: delete failed: ${e.message}")
+                            }
+                        }
+                    }
+                ) { Text("Delete", color = AppColors.ScorePoor) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) { Text("Cancel") }
+            }
+        )
     }
 
     if (patient == null) {
@@ -113,58 +155,20 @@ fun PatientProfileScreen(
 
         ProfileActionsCard(
             onNewAnalysis = onNavigateToCamera,
-            onBatchAnalysis = { },
-            onAnalysisHistory = { showHistoryDialog = true },
-            onProgressOverTime = { },
-            onEditPatient = { },
-            onDeletePatient = { },
+            onBatchAnalysis = onNavigateToBatchAnalysis,
+            onAnalysisHistory = onNavigateToAnalysisHistory,
+            onProgressOverTime = onNavigateToProgressOverTime,
+            onEditPatient = onNavigateToEditPatient,
+            onDeletePatient = { showDeleteDialog = true },
             modifier = Modifier.padding(horizontal = 16.dp)
-        )
-    }
-
-    if (showHistoryDialog) {
-        AlertDialog(
-            onDismissRequest = { showHistoryDialog = false },
-            title = { Text("Analysis History", color = AppColors.TextPrimary) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (scoresWithReviews.isEmpty()) {
-                        Text("No analyses recorded yet.", color = AppColors.TextSecondary)
-                    } else {
-                        scoresWithReviews.reversed().forEach { item ->
-                            val dateStr = formatScoreDate(item.score)
-                            TextButton(onClick = {
-                                showHistoryDialog = false
-                                onNavigateToResults(item.score.id)
-                            }) {
-                                Text("$dateStr — Score ${item.score.overallScore.toInt()}", color = AppColors.PrimaryBlue)
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showHistoryDialog = false }) {
-                    Text("Close", color = AppColors.PrimaryBlue)
-                }
-            },
-            backgroundColor = AppColors.BackgroundWhite
         )
     }
 }
 
 private fun scoreTintForValue(score: Int): Color = when {
-    score >= 75 -> AppColors.ScoreGood
-    score >= 45 -> AppColors.ScoreWarn
+    score >= 80 -> AppColors.ScoreGood
+    score >= 60 -> AppColors.ScoreWarn
     else -> AppColors.ScorePoor
-}
-
-private fun formatScoreDate(score: GaitScoreEntity): String = try {
-    val instant = Instant.fromEpochMilliseconds(score.recordedAt)
-    val local = instant.toLocalDateTime(TimeZone.currentSystemDefault())
-    "${local.month.name.take(3)} ${local.dayOfMonth}, ${local.year}"
-} catch (_: Exception) {
-    "—"
 }
 
 private fun formatPatientAdded(patient: PatientEntity): String = try {
@@ -219,10 +223,10 @@ private fun HeroPatientCard(
                 DemoStatCell("GENDER", patient.biologicalSex.takeIf { it.isNotBlank() } ?: "—", Modifier.weight(1f))
                 DemoStatCell(
                     "HEIGHT",
-                    if (patient.height != 0) "${patient.height}\"" else "—",
+                    heightDisplayInches(patient.height),
                     Modifier.weight(1f)
                 )
-                DemoStatCell("ADDED", formatPatientAdded(patient), Modifier.weight(1.2f), valueSize = 12.sp)
+                DemoStatCell("ADDED", formatPatientAdded(patient), Modifier.weight(1.2f), valueFontSize = 12.sp)
             }
             Divider(
                 color = AppColors.DividerMediumWhite,
@@ -235,18 +239,25 @@ private fun HeroPatientCard(
                     value = analysesCount.toString(),
                     modifier = Modifier.weight(1f),
                     valueColor = AppColors.TableHeaderText,
-                    valueSize = 18.sp
+                    valueFontSize = 18.sp
                 )
                 DemoStatCell(
                     label = "LATEST SCORE",
                     value = latestScoreText,
                     modifier = Modifier.weight(1f),
                     valueColor = latestScoreColor,
-                    valueSize = 18.sp
+                    valueFontSize = 18.sp
                 )
             }
         }
     }
+}
+
+private fun heightDisplayInches(totalInches: Int): String {
+    if (totalInches == 0) return "—"
+    val feet = totalInches / 12
+    val inches = totalInches % 12
+    return "$feet'$inches\""
 }
 
 @Composable
@@ -255,7 +266,7 @@ private fun DemoStatCell(
     value: String,
     modifier: Modifier = Modifier,
     valueColor: Color = AppColors.TextWhite,
-    valueSize: androidx.compose.ui.unit.TextUnit = 14.sp
+    valueFontSize: TextUnit = 14.sp
 ) {
     Column(modifier = modifier) {
         Text(
@@ -267,7 +278,7 @@ private fun DemoStatCell(
         )
         Text(
             text = value,
-            fontSize = valueSize,
+            fontSize = valueFontSize,
             fontWeight = FontWeight.Bold,
             color = valueColor
         )

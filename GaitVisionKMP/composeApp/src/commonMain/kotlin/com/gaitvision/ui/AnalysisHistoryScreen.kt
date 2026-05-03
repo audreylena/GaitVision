@@ -16,6 +16,7 @@ import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -36,6 +37,10 @@ fun AnalysisHistoryScreen(
 ) {
     val scoresWithReviews by database.gaitScoreDao().getScoresWithReviewsForPatientFlow(patientId)
         .collectAsState(initial = emptyList())
+
+    val scoresNewestFirst = remember(scoresWithReviews) {
+        scoresWithReviews.asReversed()
+    }
 
     Column(
         modifier = Modifier
@@ -63,7 +68,7 @@ fun AnalysisHistoryScreen(
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            items(scoresWithReviews.reversed(), key = { it.score.id }) { item ->
+            items(scoresNewestFirst, key = { it.score.id }) { item ->
                 HistoryScoreRow(item = item, onClick = { onNavigateToResults(item.score.id) })
             }
         }

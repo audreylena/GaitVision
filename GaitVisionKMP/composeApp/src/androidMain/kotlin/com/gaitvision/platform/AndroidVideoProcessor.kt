@@ -14,10 +14,17 @@ import android.net.Uri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.UUID
 
 class AndroidVideoProcessor(private val context: Context) : VideoProcessor {
 
     private val poseDetector = AndroidPoseDetector()
+
+    override fun processedVideoOutputPath(sourceUriOrPath: String): String {
+        val dir = File(context.cacheDir, "batch_processed").apply { mkdirs() }
+        val id = UUID.randomUUID().toString().replace("-", "").take(12)
+        return File(dir, "processed_$id.mp4").absolutePath
+    }
 
     override suspend fun processVideo(
         inputPath: String,

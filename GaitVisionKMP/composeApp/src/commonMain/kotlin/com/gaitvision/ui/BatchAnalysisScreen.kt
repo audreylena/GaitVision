@@ -52,17 +52,6 @@ private data class BatchVideoItem(
     val errorMessage: String? = null
 )
 
-private fun processedVideoOutputPath(inputPath: String): String {
-    val lastSlash = inputPath.lastIndexOf('/')
-    val lastDot = inputPath.lastIndexOf('.')
-    val filenameHasExtension = lastDot > lastSlash
-    return if (filenameHasExtension) {
-        inputPath.substring(0, lastDot) + "_processed.mp4"
-    } else {
-        inputPath + "_processed.mp4"
-    }
-}
-
 @Composable
 fun BatchAnalysisScreen(
     patientId: Long,
@@ -198,7 +187,7 @@ fun BatchAnalysisScreen(
                                 currentVideoPct = 0
                                 try {
                                     val inputPath = row.uri
-                                    val outputPath = processedVideoOutputPath(inputPath)
+                                    val outputPath = videoProcessor.processedVideoOutputPath(inputPath)
                                     val videoId = database.videoDao().insertVideo(
                                         VideoEntity(
                                             patientId = patientId,

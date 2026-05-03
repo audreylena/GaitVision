@@ -29,6 +29,7 @@ object Screen {
     const val Settings = "settings"
     const val Help = "help"
     const val Info = "info"
+    const val AuditLog = "audit_log"
     const val Csv = "csv/{scoreId}"
 
     fun createAiDisclosureRoute(patientId: Long) = "ai_disclosure/$patientId"
@@ -128,7 +129,11 @@ fun AppNavigation(
         composable(Screen.Analysis) {
             AnalysisScreen(
                 onNavigateBack = { navController.popBackStack() },
-                database = database
+                database = database,
+                onNavigateToPatientList = { navController.navigate(Screen.PatientList) },
+                onNavigateToLatestResults = { scoreId ->
+                    navController.navigate(Screen.createResultsRoute(scoreId))
+                }
             )
         }
 
@@ -268,7 +273,18 @@ fun AppNavigation(
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToHelp = { navController.navigate(Screen.Help) },
                 onNavigateToInfo = { navController.navigate(Screen.Info) },
-                onNavigateToCsv = { }
+                database = database,
+                onNavigateToCsvExport = { scoreId ->
+                    navController.navigate(Screen.createCsvRoute(scoreId))
+                },
+                onNavigateToAuditLog = { navController.navigate(Screen.AuditLog) }
+            )
+        }
+
+        composable(Screen.AuditLog) {
+            AuditLogScreen(
+                database = database,
+                onNavigateBack = { navController.popBackStack() }
             )
         }
 

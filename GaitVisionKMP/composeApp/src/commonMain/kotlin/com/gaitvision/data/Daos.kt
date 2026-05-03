@@ -204,6 +204,9 @@ interface GaitScoreDao {
 
     @Query("SELECT * FROM gait_scores ORDER BY recordedAt DESC")
     fun getAllScoresFlow(): Flow<List<GaitScoreEntity>>
+
+    @Query("SELECT * FROM gait_scores ORDER BY recordedAt DESC, id DESC LIMIT 1")
+    suspend fun getLatestScoreGlobally(): GaitScoreEntity?
 }
 
 @Dao

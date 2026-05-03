@@ -30,12 +30,21 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gaitvision.data.AppDatabase
 import com.gaitvision.data.GaitScoreEntity
+import kotlin.math.abs
+import kotlin.math.round
 
 private data class ProgressMetric(
     val label: String,
     val unit: String,
     val extractor: (GaitScoreEntity) -> Float?
 )
+
+private fun formatOneDecimal(value: Float): String {
+    val scaled = round(value * 10f).toLong()
+    val whole = scaled / 10
+    val frac = abs(scaled % 10)
+    return "$whole.$frac"
+}
 
 private val PROGRESS_METRICS = listOf(
     ProgressMetric("Overall Score", "/100") { it.overallScore.toFloat() },
@@ -182,7 +191,7 @@ private fun ProgressMetricChartCard(
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = points.takeLast(3).joinToString(" · ") { (_, v) ->
-                    String.format("%.1f", v)
+                    formatOneDecimal(v)
                 }.ifBlank { "—" },
                 color = AppColors.ChartAxisText,
                 fontSize = 11.sp

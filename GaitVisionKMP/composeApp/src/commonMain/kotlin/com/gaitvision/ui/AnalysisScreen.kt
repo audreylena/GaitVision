@@ -25,6 +25,10 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Science
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -34,13 +38,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gaitvision.data.AppDatabase
+import kotlinx.coroutines.launch
 
 @Composable
-@Suppress("UNUSED_PARAMETER")
 fun AnalysisScreen(
     onNavigateBack: () -> Unit,
-    database: AppDatabase
+    database: AppDatabase,
+    onNavigateToPatientList: () -> Unit,
+    onNavigateToLatestResults: (Long) -> Unit
 ) {
+    val scope = rememberSafeCoroutineScope()
+    var viewResultsHint by remember { mutableStateOf<String?>(null) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -87,7 +96,7 @@ fun AnalysisScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { }
+                        .clickable(onClick = onNavigateToPatientList)
                         .padding(horizontal = 20.dp, vertical = 18.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -233,7 +242,17 @@ fun AnalysisScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { }
+                        .clickable {
+                            scope.launch {
+                                val latest = database.gaitScoreDao().getLatestScoreGlobally()
+                                if (latest != null) {
+                                    viewResultsHint = null
+                                    onNavigateToLatestResults(latest.id)
+                                } else {
+                                    viewResultsHint = "No saved analyses yet — run one from a patient first."
+                                }
+                            }
+                        }
                         .padding(horizontal = 20.dp, vertical = 18.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -258,6 +277,14 @@ fun AnalysisScreen(
                         modifier = Modifier.size(18.dp)
                     )
                 }
+            }
+            viewResultsHint?.let { hint ->
+                Text(
+                    text = hint,
+                    color = AppColors.ChartAxisText,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(start = 4.dp, top = 8.dp)
+                )
             }
         }
     }

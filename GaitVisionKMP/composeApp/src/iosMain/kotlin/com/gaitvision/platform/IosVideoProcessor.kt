@@ -7,8 +7,10 @@ import platform.AVFoundation.*
 import platform.CoreGraphics.*
 import platform.CoreMedia.*
 import platform.CoreVideo.*
-import platform.Foundation.NSURL
 import platform.Foundation.NSError
+import platform.Foundation.NSURL
+import platform.Foundation.NSUUID
+import platform.Foundation.NSTemporaryDirectory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import platform.darwin.NSObject
@@ -16,6 +18,12 @@ import platform.darwin.NSObject
 @OptIn(ExperimentalForeignApi::class)
 class IOSVideoProcessor : VideoProcessor {
     private val poseDetector = IOSPoseDetector()
+
+    override fun processedVideoOutputPath(sourceUriOrPath: String): String {
+        val id = NSUUID.UUID().UUIDString
+        val tmp = NSTemporaryDirectory().trimEnd('/', '\\')
+        return "$tmp/gait_batch_$id.mp4"
+    }
 
     override suspend fun processVideo(
         inputPath: String,

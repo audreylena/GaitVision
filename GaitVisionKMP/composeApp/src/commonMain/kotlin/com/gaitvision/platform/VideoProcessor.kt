@@ -2,6 +2,14 @@ package com.gaitvision.platform
 
 interface VideoProcessor {
     /**
+     * Absolute filesystem path where batch/camera pipelines should write encoded output.
+     * Must be writable on each platform (e.g. Android cache dir for content:// inputs).
+     *
+     * @param sourceUriOrPath Original picker URI or path (used only as a uniqueness hint on some platforms).
+     */
+    fun processedVideoOutputPath(sourceUriOrPath: String): String
+
+    /**
      * Processes a video file to extract frames, run pose detection,
      * draw the skeleton overlay, and save the result.
      *
@@ -11,7 +19,7 @@ interface VideoProcessor {
      * @return The path to the processed video, or null if failed.
      */
     suspend fun processVideo(
-        inputPath: String, 
+        inputPath: String,
         outputPath: String,
         onProgress: (Int) -> Unit,
         onPoseDetected: (Pose) -> Unit

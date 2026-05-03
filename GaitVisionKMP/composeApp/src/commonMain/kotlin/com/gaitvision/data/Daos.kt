@@ -177,6 +177,9 @@ interface VideoDao {
     @Query("SELECT * FROM videos WHERE patientId = :patientId ORDER BY recordedAt DESC")
     fun getVideosForPatientFlow(patientId: Long): Flow<List<VideoEntity>>
 
+    @Query("SELECT * FROM videos")
+    fun getAllVideosFlow(): Flow<List<VideoEntity>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertVideo(video: VideoEntity): Long
 }

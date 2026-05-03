@@ -1,17 +1,41 @@
 package com.gaitvision.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.*
+import androidx.compose.material.Button
+import androidx.compose.material.ButtonDefaults
+import androidx.compose.material.Card
+import androidx.compose.material.CircularProgressIndicator
+import androidx.compose.material.Divider
+import androidx.compose.material.Icon
+import androidx.compose.material.MaterialTheme
+import androidx.compose.material.Surface
+import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -48,173 +72,84 @@ fun ResultsScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        Text(
-                            "Analysis Results",
-                            style = MaterialTheme.typography.h5.copy(fontWeight = FontWeight.Bold),
-                            color = Color.White
-                        )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
-                    }
-                },
-                backgroundColor = Color.Transparent,
-                elevation = 0.dp,
-                actions = { Spacer(modifier = Modifier.width(48.dp)) }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(AppColors.ActivityContainerBg)
+    ) {
+        CommonScreenHeader(title = "Analysis Results", onBack = onNavigateBack)
+
+        when {
+            scoreEntity == null -> {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = AppColors.PrimaryBlue)
+                }
+            }
+            else -> {
+                val score = scoreEntity!!
+                val overall = score.overallScore.toInt()
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState())
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+            AiDisclaimerBanner()
+            Spacer(modifier = Modifier.height(16.dp))
+
+            ClinicianReviewSection(
+                scoreId = scoreId,
+                database = database,
+                reviewEntity = reviewEntity,
+                onReviewUpdated = { reviewEntity = it },
+                scope = scope
             )
-        },
-        backgroundColor = BgUltraDarkBlue
-    ) { paddingValues ->
-        if (scoreEntity == null) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = PrimaryBlue)
-            }
-            return@Scaffold
-        }
-
-        val score = scoreEntity!!
-        val overall = score.overallScore.toInt()
-
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // ── Disclaimer Banner #1 (SB 1188 § 183.005) ──
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                backgroundColor = Color(0xFFFF8F00).copy(alpha = 0.15f),
-                elevation = 0.dp,
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFF8F00))
-            ) {
-                Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("⚠️", style = MaterialTheme.typography.h6)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        "These results were generated using artificial intelligence and must be reviewed by a licensed healthcare practitioner before clinical use.",
-                        style = MaterialTheme.typography.caption,
-                        color = Color(0xFFFFCC80)
-                    )
-                }
-            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // ── Clinician Review Card (SB 1188 § 183.005(a)(3)) ──
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
-                backgroundColor = CardSurfaceDark,
-                elevation = 0.dp
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        "Clinician Review",
-                        style = MaterialTheme.typography.body2,
-                        color = TextSlate,
-                        modifier = Modifier.padding(bottom = 12.dp)
-                    )
-                    val isReviewed = reviewEntity?.isReviewed == true
-                    // Status badge
-                    Surface(
-                        color = if (isReviewed) Color(0xFF1B5E20).copy(alpha = 0.3f) else Color(0xFFE65100).copy(alpha = 0.3f),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            text = if (isReviewed) "✓  Reviewed" else "⏳  Pending Review",
-                            color = if (isReviewed) Color(0xFF81C784) else Color(0xFFFFB74D),
-                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                            modifier = Modifier.padding(12.dp)
-                        )
-                    }
-                    if (!isReviewed) {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Button(
-                            onClick = {
-                                scope.launch {
-                                    try {
-                                        val review = ClinicianReviewEntity(
-                                            gaitScoreId = scoreId,
-                                            isReviewed = true,
-                                            reviewTimestamp = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
-                                        )
-                                        database.clinicianReviewDao().insertReview(review)
-                                        reviewEntity = review
-                                    } catch (e: Exception) {
-                                        println("ResultsScreen: review insert failed: ${e.message}")
-                                    }
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(backgroundColor = PrimaryBlue)
-                        ) {
-                            Text("Mark as Reviewed", color = Color.White)
-                        }
-                    } else {
-                        reviewEntity?.reviewTimestamp?.let { ts ->
-                            Spacer(modifier = Modifier.height(8.dp))
-                            val fmt = try {
-                                val inst = kotlinx.datetime.Instant.fromEpochMilliseconds(ts)
-                                val ldt = inst.toLocalDateTime(kotlinx.datetime.TimeZone.currentSystemDefault())
-                                "${ldt.month.name.take(3)} ${ldt.dayOfMonth}, ${ldt.year} ${ldt.hour.toString().padStart(2,'0')}:${ldt.minute.toString().padStart(2,'0')}"
-                            } catch (e: Exception) { "" }
-                            Text("Reviewed: $fmt", style = MaterialTheme.typography.caption, color = TextSlate)
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-            // Main Score Card
-            Card(
-                modifier = Modifier.fillMaxWidth().height(220.dp),
-                shape = RoundedCornerShape(16.dp),
-                backgroundColor = CardSurfaceDark,
+                backgroundColor = AppColors.CardInnerDark,
                 elevation = 0.dp
             ) {
                 Column(
-                    modifier = Modifier.fillMaxSize(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        "GAIT SCORE",
-                        style = MaterialTheme.typography.caption.copy(letterSpacing = 2.sp),
-                        color = TextSlate
+                        text = "GAIT SCORE",
+                        fontSize = 14.sp,
+                        letterSpacing = 2.sp,
+                        color = Color(0xFF999999)
                     )
-                    Spacer(modifier = Modifier.height(32.dp))
-                    
-                    // Simple Score Bar / Segment mockup
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Box(modifier = Modifier.size(width = 40.dp, height = 8.dp).background(ButtonDanger, RoundedCornerShape(4.dp)))
-                        Box(modifier = Modifier.size(width = 40.dp, height = 8.dp).background(ButtonDanger, RoundedCornerShape(4.dp)))
-                    }
-                    
-                    Spacer(modifier = Modifier.height(32.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        "Feature extraction not run",
-                        style = MaterialTheme.typography.body1,
-                        color = Color.White
+                        text = overall.toString(),
+                        fontSize = 72.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = gaitScoreHue(overall)
                     )
-                    // Patient biological sex metadata — SB 1188 § 183.007(a)(2)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = gaitScoreCaption(overall),
+                        fontSize = 16.sp,
+                        color = AppColors.TextWhite
+                    )
                     if (score.biologicalSex.isNotBlank()) {
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            "Patient Sex: ${score.biologicalSex}",
+                            text = "Patient Sex: ${score.biologicalSex}",
                             style = MaterialTheme.typography.caption,
-                            color = TextSlate
+                            color = AppColors.ChartAxisText
                         )
                     }
                 }
@@ -222,38 +157,38 @@ fun ResultsScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Model Scores Section
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                backgroundColor = CardSurfaceDark,
+                shape = RoundedCornerShape(12.dp),
+                backgroundColor = AppColors.CardInnerDark,
                 elevation = 0.dp
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        "Model Scores",
-                        style = MaterialTheme.typography.body2,
-                        color = TextSlate,
+                        text = "Model Scores",
+                        fontSize = 12.sp,
+                        letterSpacing = 1.sp,
+                        color = Color(0xFF999999),
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
-                    
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        ScoreMetricItem("Autoencoder", "--", PrimaryPurple)
-                        ScoreMetricItem("Ridge", "--", PrimaryBlue)
-                        ScoreMetricItem("PCA", "--", AccentGreen)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        ScoreMetricItem("Autoencoder", "--", AppColors.IconPurple)
+                        ScoreMetricItem("Ridge", "--", AppColors.RidgeBlue)
+                        ScoreMetricItem("PCA", "--", AppColors.IconGreen)
                     }
-                    
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        "100 = Healthy, 0 = Impaired",
-                        style = MaterialTheme.typography.caption,
-                        color = TextSlate,
+                        text = "100 = Healthy, 0 = Impaired",
+                        fontSize = 10.sp,
+                        color = AppColors.ChartNoDataText,
                         modifier = Modifier.align(Alignment.CenterHorizontally)
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                    // ── Disclaimer Banner #2 ──
                     Text(
-                        "AI-generated scores are decision-support tools and do not constitute a medical diagnosis.",
+                        text = "AI-generated scores are decision-support tools and do not constitute a medical diagnosis.",
                         style = MaterialTheme.typography.caption,
                         color = Color(0xFFFFCC80),
                         modifier = Modifier.align(Alignment.CenterHorizontally)
@@ -263,35 +198,160 @@ fun ResultsScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Action List
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
-                backgroundColor = CardSurfaceDark,
-                elevation = 0.dp
+                backgroundColor = AppColors.CardSurfaceDark,
+                elevation = 3.dp
             ) {
                 Column {
-                    ResultActionRow(
+                    LegacyResultsActionRow(
                         title = "View Gait Features",
-                        icon = Icons.Default.List,
+                        icon = Icons.Default.Description,
+                        iconTint = Color(0xFFAAAAAA),
+                        chevronTint = Color(0xFFAAAAAA),
+                        showChevron = true,
                         onClick = onNavigateToFeatures
                     )
-                    Divider(color = BgUltraDarkBlue, thickness = 1.dp)
-                    ResultActionRow(
+                    Divider(color = AppColors.DividerLightWhite, thickness = 1.dp)
+                    LegacyResultsActionRow(
                         title = "View Signal Dashboard",
-                        icon = Icons.Default.Search,
+                        icon = Icons.Default.BarChart,
+                        iconTint = AppColors.SignalsOrange,
+                        chevronTint = AppColors.SignalsOrange,
+                        showChevron = true,
                         onClick = { onNavigateToSignals(scoreId) }
                     )
-                    Divider(color = BgUltraDarkBlue, thickness = 1.dp)
-                    ResultActionRow(
+                    Divider(color = AppColors.DividerLightWhite, thickness = 1.dp)
+                    LegacyResultsActionRow(
                         title = "Export CSV Files",
-                        icon = Icons.Default.Share,
+                        icon = Icons.Default.Description,
+                        iconTint = AppColors.RidgeBlue,
+                        chevronTint = AppColors.RidgeBlue,
+                        showChevron = false,
                         onClick = { onNavigateToCsv(scoreId) }
                     )
                 }
             }
-            
+
             Spacer(modifier = Modifier.height(32.dp))
+                }
+            }
+        }
+    }
+}
+
+private fun gaitScoreHue(score: Int): Color = when {
+    score >= 75 -> AppColors.IconGreen
+    score >= 45 -> AppColors.ScoreWarn
+    else -> AppColors.ScorePoor
+}
+
+private fun gaitScoreCaption(score: Int): String = when {
+    score >= 75 -> "Functional gait pattern"
+    score >= 45 -> "Mixed findings — clinical correlation advised"
+    else -> "Marked deviation — review recommended"
+}
+
+@Composable
+private fun AiDisclaimerBanner() {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        backgroundColor = Color(0xFFFF8F00).copy(alpha = 0.15f),
+        elevation = 0.dp,
+        border = BorderStroke(1.dp, Color(0xFFFF8F00))
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                Icons.Default.Warning,
+                contentDescription = null,
+                tint = Color(0xFFFFB74D),
+                modifier = Modifier.size(28.dp)
+            )
+            Spacer(modifier = Modifier.size(8.dp))
+            Text(
+                text = "These results were generated using artificial intelligence and must be reviewed by a licensed healthcare practitioner before clinical use.",
+                style = MaterialTheme.typography.caption,
+                color = Color(0xFFFFCC80)
+            )
+        }
+    }
+}
+
+@Composable
+private fun ClinicianReviewSection(
+    scoreId: Long,
+    database: AppDatabase,
+    reviewEntity: ClinicianReviewEntity?,
+    onReviewUpdated: (ClinicianReviewEntity?) -> Unit,
+    scope: kotlinx.coroutines.CoroutineScope
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        backgroundColor = AppColors.CardSurfaceDark,
+        elevation = 0.dp
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "Clinician Review",
+                style = MaterialTheme.typography.body2,
+                color = TextSlate,
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
+            val isReviewed = reviewEntity?.isReviewed == true
+            Surface(
+                color = if (isReviewed) Color(0xFF1B5E20).copy(alpha = 0.3f) else Color(0xFFE65100).copy(alpha = 0.3f),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = if (isReviewed) "Reviewed" else "Pending Review",
+                    color = if (isReviewed) Color(0xFF81C784) else Color(0xFFFFB74D),
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(12.dp)
+                )
+            }
+            if (!isReviewed) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(
+                    onClick = {
+                        scope.launch {
+                            try {
+                                val review = ClinicianReviewEntity(
+                                    gaitScoreId = scoreId,
+                                    isReviewed = true,
+                                    reviewTimestamp = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
+                                )
+                                database.clinicianReviewDao().insertReview(review)
+                                onReviewUpdated(review)
+                            } catch (e: Exception) {
+                                println("ResultsScreen: review insert failed: ${e.message}")
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(backgroundColor = PrimaryBlue)
+                ) {
+                    Text("Mark as Reviewed", color = Color.White)
+                }
+            } else {
+                reviewEntity?.reviewTimestamp?.let { ts ->
+                    Spacer(modifier = Modifier.height(8.dp))
+                    val fmt = try {
+                        val inst = kotlinx.datetime.Instant.fromEpochMilliseconds(ts)
+                        val ldt = inst.toLocalDateTime(kotlinx.datetime.TimeZone.currentSystemDefault())
+                        "${ldt.month.name.take(3)} ${ldt.dayOfMonth}, ${ldt.year} ${ldt.hour.toString().padStart(2, '0')}:${ldt.minute.toString().padStart(2, '0')}"
+                    } catch (_: Exception) {
+                        ""
+                    }
+                    Text("Reviewed: $fmt", style = MaterialTheme.typography.caption, color = TextSlate)
+                }
+            }
         }
     }
 }
@@ -306,17 +366,37 @@ fun ScoreMetricItem(label: String, value: String, color: Color) {
 }
 
 @Composable
-fun ResultActionRow(title: String, icon: ImageVector, onClick: () -> Unit) {
+fun LegacyResultsActionRow(
+    title: String,
+    icon: ImageVector,
+    iconTint: Color,
+    chevronTint: Color,
+    showChevron: Boolean,
+    onClick: () -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(16.dp),
+            .padding(horizontal = 20.dp, vertical = 18.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(icon, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(24.dp))
-        Spacer(modifier = Modifier.width(16.dp))
-        Text(title, style = MaterialTheme.typography.subtitle1.copy(fontWeight = FontWeight.Bold), color = Color.White, modifier = Modifier.weight(1f))
-        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = TextSlate)
+        Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(22.dp))
+        Spacer(modifier = Modifier.size(16.dp))
+        Text(
+            title,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.White,
+            modifier = Modifier.weight(1f)
+        )
+        if (showChevron) {
+            Icon(
+                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = chevronTint,
+                modifier = Modifier.size(18.dp)
+            )
+        }
     }
 }

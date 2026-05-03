@@ -1,62 +1,62 @@
 package com.gaitvision.ui
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Typography
 import androidx.compose.material.darkColors
 import androidx.compose.material.lightColors
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 
 object ThemeConfig {
     var isDarkMode by mutableStateOf<Boolean?>(null)
 }
 
-// App Colors from original Android app design
-val BgUltraDarkBlue = Color(0xFF1A1A2E)
+// Legacy aliases — screens reference these; underlying values match Android colors.xml via [AppColors].
+val BgUltraDarkBlue = AppColors.ActivityContainerBg
 val BgDarkBlue = Color(0xFF16213E)
-val CardSurfaceDark = Color(0xFF252542)
-val TextLight = Color(0xFFFFFFFF)
+val CardSurfaceDark = AppColors.CardSurfaceDark
+val TextLight = AppColors.TextWhite
 val TextLightMuted = Color(0xFFE2E8F0)
-val TextSlate = Color(0xFF94A3B8)
+val TextSlate = AppColors.TextTertiary
 
-val PrimaryBlue = Color(0xFF3B82F6)
-val PrimaryPurple = Color(0xFF8B5CF6)
-val SecondaryTeal = Color(0xFF0891B2)
-val AccentGreen = Color(0xFF10B981)
-val ButtonDanger = Color(0xFFF43F5E)
+val PrimaryBlue = AppColors.PrimaryBlue
+val PrimaryPurple = AppColors.AccentPurple
+val SecondaryTeal = AppColors.SecondaryTeal
+val AccentGreen = AppColors.AccentGreen
+val ButtonDanger = AppColors.ButtonDanger
 
 private val DarkColorPalette = darkColors(
-    primary = PrimaryBlue,
-    primaryVariant = PrimaryPurple,
-    secondary = AccentGreen,
-    background = BgUltraDarkBlue,
-    surface = CardSurfaceDark,
-    onPrimary = TextLight,
-    onSecondary = TextLight,
-    onBackground = TextLight,
-    onSurface = TextLight
+    primary = AppColors.PrimaryBlue,
+    primaryVariant = AppColors.PrimaryBlueDark,
+    secondary = AppColors.SecondaryTeal,
+    background = AppColors.ActivityContainerBg,
+    surface = AppColors.CardSurfaceDark,
+    onPrimary = AppColors.TextWhite,
+    onSecondary = AppColors.TextWhite,
+    onBackground = AppColors.TextWhite,
+    onSurface = AppColors.TextWhite
 )
 
 private val LightColorPalette = lightColors(
-    primary = PrimaryBlue,
-    primaryVariant = PrimaryPurple,
-    secondary = AccentGreen,
-    background = Color(0xFFF1F5F9),
-    surface = Color.White,
-    onPrimary = Color.White,
-    onSecondary = Color.White,
-    onBackground = Color(0xFF0F172A),
+    primary = AppColors.PrimaryBlue,
+    primaryVariant = AppColors.PrimaryBlueDark,
+    secondary = AppColors.SecondaryTeal,
+    background = AppColors.SurfaceLight,
+    surface = AppColors.CardBackground,
+    onPrimary = AppColors.TextWhite,
+    onSecondary = AppColors.TextWhite,
+    onBackground = AppColors.TextPrimary,
     onSurface = Color(0xFF1E293B)
 )
 
+/** Typography aligned with Android `themes.xml` text roles (SectionTitle 16sp bold, InputLabel 14sp, Primary button 16sp bold). */
 val AppTypography = Typography(
     h1 = TextStyle(
         fontFamily = FontFamily.SansSerif,
@@ -78,6 +78,16 @@ val AppTypography = Typography(
         fontWeight = FontWeight.Medium,
         fontSize = 18.sp
     ),
+    subtitle1 = TextStyle(
+        fontFamily = FontFamily.SansSerif,
+        fontWeight = FontWeight.Bold,
+        fontSize = 16.sp
+    ),
+    subtitle2 = TextStyle(
+        fontFamily = FontFamily.SansSerif,
+        fontWeight = FontWeight.Medium,
+        fontSize = 14.sp
+    ),
     body1 = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Normal,
@@ -91,28 +101,28 @@ val AppTypography = Typography(
     button = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Bold,
-        fontSize = 14.sp,
-        letterSpacing = 1.sp
+        fontSize = 16.sp,
+        letterSpacing = 0.sp
     ),
     caption = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Normal,
         fontSize = 12.sp
+    ),
+    overline = TextStyle(
+        fontFamily = FontFamily.SansSerif,
+        fontWeight = FontWeight.Bold,
+        fontSize = 10.sp,
+        letterSpacing = 0.1.sp
     )
 )
 
 @Composable
 fun GaitVisionTheme(
-    // We enforce dark theme by default based on screenshots, 
-    // unless explicitly changed.
     darkTheme: Boolean = ThemeConfig.isDarkMode ?: true,
     content: @Composable () -> Unit
 ) {
-    val colors = if (darkTheme) {
-        DarkColorPalette
-    } else {
-        LightColorPalette
-    }
+    val colors = if (darkTheme) DarkColorPalette else LightColorPalette
 
     MaterialTheme(
         colors = colors,

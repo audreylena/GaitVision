@@ -19,17 +19,26 @@ object Screen {
     const val Analysis = "analysis"
     const val PatientList = "patient_list"
     const val PatientCreate = "patient_create"
+    const val PatientEdit = "patient_edit/{patientId}"
     const val PatientProfile = "patient_profile/{patientId}"
+    const val BatchAnalysis = "batch_analysis/{patientId}"
+    const val AnalysisHistory = "analysis_history/{patientId}"
+    const val ProgressOverTime = "progress_over_time/{patientId}"
     const val Results = "results/{scoreId}"
     const val SignalsDashboard = "signals_dashboard/{scoreId}"
     const val Settings = "settings"
     const val Help = "help"
     const val Info = "info"
+    const val AuditLog = "audit_log"
     const val Csv = "csv/{scoreId}"
 
     fun createAiDisclosureRoute(patientId: Long) = "ai_disclosure/$patientId"
     fun createCameraRoute(patientId: Long) = "camera/$patientId"
     fun createPatientProfileRoute(patientId: Long) = "patient_profile/$patientId"
+    fun createPatientEditRoute(patientId: Long) = "patient_edit/$patientId"
+    fun createBatchAnalysisRoute(patientId: Long) = "batch_analysis/$patientId"
+    fun createAnalysisHistoryRoute(patientId: Long) = "analysis_history/$patientId"
+    fun createProgressOverTimeRoute(patientId: Long) = "progress_over_time/$patientId"
     fun createResultsRoute(scoreId: Long) = "results/$scoreId"
     fun createSignalsDashboardRoute(scoreId: Long) = "signals_dashboard/$scoreId"
     fun createCsvRoute(scoreId: Long) = "csv/$scoreId"
@@ -120,7 +129,11 @@ fun AppNavigation(
         composable(Screen.Analysis) {
             AnalysisScreen(
                 onNavigateBack = { navController.popBackStack() },
-                database = database
+                database = database,
+                onNavigateToPatientList = { navController.navigate(Screen.PatientList) },
+                onNavigateToLatestResults = { scoreId ->
+                    navController.navigate(Screen.createResultsRoute(scoreId))
+                }
             )
         }
 
@@ -145,6 +158,20 @@ fun AppNavigation(
         }
 
         composable(
+            route = Screen.PatientEdit,
+            arguments = listOf(navArgument("patientId") { type = NavType.LongType })
+        ) { backStackEntry ->
+            val patientId = backStackEntry.arguments?.getLong("patientId") ?: 0L
+            PatientCreateScreen(
+                database = database,
+                onNavigateBack = { navController.popBackStack() },
+                onPatientCreated = { navController.popBackStack() },
+                onNavigateToCamera = { pid -> navigateToCameraOrConsent(pid) },
+                editingPatientId = patientId
+            )
+        }
+
+        composable(
             route = Screen.PatientProfile,
             arguments = listOf(navArgument("patientId") { type = NavType.LongType })
         ) { backStackEntry ->
@@ -156,7 +183,59 @@ fun AppNavigation(
                 onNavigateToResults = { scoreId ->
                     navController.navigate(Screen.createResultsRoute(scoreId))
                 },
-                onNavigateToCamera = { navigateToCameraOrConsent(patientId) }
+                onNavigateToCamera = { navigateToCameraOrConsent(patientId) },
+                onNavigateToBatchAnalysis = {
+                    navController.navigate(Screen.createBatchAnalysisRoute(patientId))
+                },
+                onNavigateToAnalysisHistory = {
+                    navController.navigate(Screen.createAnalysisHistoryRoute(patientId))
+                },
+                onNavigateToProgressOverTime = {
+                    navController.navigate(Screen.createProgressOverTimeRoute(patientId))
+                },
+                onNavigateToEditPatient = {
+                    navController.navigate(Screen.createPatientEditRoute(patientId))
+                }
+            )
+        }
+
+        composable(
+            route = Screen.BatchAnalysis,
+            arguments = listOf(navArgument("patientId") { type = NavType.LongType })
+        ) { backStackEntry ->
+            val patientId = backStackEntry.arguments?.getLong("patientId") ?: 0L
+            BatchAnalysisScreen(
+                patientId = patientId,
+                database = database,
+                videoProcessor = videoProcessor,
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = Screen.AnalysisHistory,
+            arguments = listOf(navArgument("patientId") { type = NavType.LongType })
+        ) { backStackEntry ->
+            val patientId = backStackEntry.arguments?.getLong("patientId") ?: 0L
+            AnalysisHistoryScreen(
+                patientId = patientId,
+                database = database,
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToResults = { scoreId ->
+                    navController.navigate(Screen.createResultsRoute(scoreId))
+                }
+            )
+        }
+
+        composable(
+            route = Screen.ProgressOverTime,
+            arguments = listOf(navArgument("patientId") { type = NavType.LongType })
+        ) { backStackEntry ->
+            val patientId = backStackEntry.arguments?.getLong("patientId") ?: 0L
+            ProgressOverTimeScreen(
+                patientId = patientId,
+                database = database,
+                onNavigateBack = { navController.popBackStack() }
             )
         }
 
@@ -194,7 +273,18 @@ fun AppNavigation(
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToHelp = { navController.navigate(Screen.Help) },
                 onNavigateToInfo = { navController.navigate(Screen.Info) },
-                onNavigateToCsv = { }
+                database = database,
+                onNavigateToCsvExport = { scoreId ->
+                    navController.navigate(Screen.createCsvRoute(scoreId))
+                },
+                onNavigateToAuditLog = { navController.navigate(Screen.AuditLog) }
+            )
+        }
+
+        composable(Screen.AuditLog) {
+            AuditLogScreen(
+                database = database,
+                onNavigateBack = { navController.popBackStack() }
             )
         }
 

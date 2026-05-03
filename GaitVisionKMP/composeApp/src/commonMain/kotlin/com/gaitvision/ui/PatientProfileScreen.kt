@@ -1,25 +1,52 @@
 package com.gaitvision.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.*
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.AlertDialog
+import androidx.compose.material.Card
+import androidx.compose.material.CircularProgressIndicator
+import androidx.compose.material.Divider
+import androidx.compose.material.Icon
+import androidx.compose.material.Surface
+import androidx.compose.material.Text
+import androidx.compose.material.TextButton
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
-import androidx.compose.runtime.*
+import androidx.compose.ui.unit.sp
 import com.gaitvision.data.AppDatabase
 import com.gaitvision.data.AuditLogger
-import com.gaitvision.data.ClinicianReviewEntity
 import com.gaitvision.data.GaitScoreEntity
 import com.gaitvision.data.PatientEntity
 import kotlinx.coroutines.launch
@@ -33,11 +60,17 @@ fun PatientProfileScreen(
     database: AppDatabase,
     onNavigateBack: () -> Unit,
     onNavigateToResults: (Long) -> Unit,
-    onNavigateToCamera: () -> Unit = {}
+    onNavigateToCamera: () -> Unit = {},
+    onNavigateToBatchAnalysis: () -> Unit = {},
+    onNavigateToAnalysisHistory: () -> Unit = {},
+    onNavigateToProgressOverTime: () -> Unit = {},
+    onNavigateToEditPatient: () -> Unit = {}
 ) {
+    val scope = rememberSafeCoroutineScope()
     var patient by remember { mutableStateOf<PatientEntity?>(null) }
     val scoresWithReviews by database.gaitScoreDao().getScoresWithReviewsForPatientFlow(patientId)
         .collectAsState(initial = emptyList())
+    var showDeleteDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(patientId) {
         try {
@@ -48,237 +81,330 @@ fun PatientProfileScreen(
         }
     }
 
+    if (showDeleteDialog && patient != null) {
+        val pDel = patient!!
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("Delete Patient") },
+            text = {
+                Text(
+                    "Are you sure you want to delete this patient and all their analysis data? This cannot be undone."
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteDialog = false
+                        scope.launch {
+                            try {
+                                database.patientDao().deletePatient(pDel)
+                                AuditLogger.log(
+                                    database.auditLogDao(),
+                                    "DELETE_PATIENT",
+                                    patientId = patientId
+                                )
+                                onNavigateBack()
+                            } catch (e: Exception) {
+                                println("PatientProfileScreen: delete failed: ${e.message}")
+                            }
+                        }
+                    }
+                ) { Text("Delete", color = AppColors.ScorePoor) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
+
     if (patient == null) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
+            CircularProgressIndicator(color = AppColors.PrimaryBlue)
         }
         return
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Patient Profile") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                backgroundColor = MaterialTheme.colors.primary,
-                contentColor = MaterialTheme.colors.onPrimary,
-                elevation = 4.dp,
-                actions = {
-                    IconButton(onClick = onNavigateToCamera) {
-                        Icon(Icons.Default.Add, contentDescription = "New Analysis")
-                    }
-                }
+    val p = patient!!
+    val subtitle = "${p.firstName} ${p.lastName}".trim()
+    val analysesCount = scoresWithReviews.size
+    val latestOverall = scoresWithReviews.lastOrNull()?.score?.overallScore?.toInt()
+    val latestScoreColor = latestOverall?.let(::scoreTintForValue) ?: AppColors.ChartAxisText
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(AppColors.ActivityContainerBg)
+            .verticalScroll(rememberScrollState())
+            .padding(bottom = 16.dp)
+    ) {
+        CommonScreenHeader(
+            title = "Patient Profile",
+            subtitle = subtitle,
+            onBack = onNavigateBack
+        )
+
+        HeroPatientCard(
+            patient = p,
+            analysesCount = analysesCount,
+            latestScoreText = latestOverall?.toString() ?: "—",
+            latestScoreColor = latestScoreColor,
+            modifier = Modifier.padding(horizontal = 16.dp)
+        )
+
+        ProgressChartPlaceholderCard(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp))
+
+        ProfileActionsCard(
+            onNewAnalysis = onNavigateToCamera,
+            onBatchAnalysis = onNavigateToBatchAnalysis,
+            onAnalysisHistory = onNavigateToAnalysisHistory,
+            onProgressOverTime = onNavigateToProgressOverTime,
+            onEditPatient = onNavigateToEditPatient,
+            onDeletePatient = { showDeleteDialog = true },
+            modifier = Modifier.padding(horizontal = 16.dp)
+        )
+    }
+}
+
+private fun scoreTintForValue(score: Int): Color = when {
+    score >= 80 -> AppColors.ScoreGood
+    score >= 60 -> AppColors.ScoreWarn
+    else -> AppColors.ScorePoor
+}
+
+private fun formatPatientAdded(patient: PatientEntity): String = try {
+    val instant = Instant.fromEpochMilliseconds(patient.createdAt)
+    val local = instant.toLocalDateTime(TimeZone.currentSystemDefault())
+    "${local.month.name.take(3)} ${local.dayOfMonth}, ${local.year}"
+} catch (_: Exception) {
+    "—"
+}
+
+@Composable
+private fun HeroPatientCard(
+    patient: PatientEntity,
+    analysesCount: Int,
+    latestScoreText: String,
+    latestScoreColor: Color,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        backgroundColor = AppColors.CardSurfaceDark,
+        elevation = 4.dp
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Text(
+                text = "${patient.firstName} ${patient.lastName}".trim(),
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                color = AppColors.TextWhite
             )
-        },
-        backgroundColor = MaterialTheme.colors.background
-    ) { paddingValues ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // Patient Header Card
-            item {
-                Card(elevation = 4.dp, shape = RoundedCornerShape(12.dp)) {
-                    Column(
-                        modifier = Modifier.padding(20.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Surface(
-                            modifier = Modifier.size(80.dp),
-                            shape = RoundedCornerShape(40.dp),
-                            color = MaterialTheme.colors.primary.copy(alpha = 0.1f)
-                        ) {
-                            Icon(
-                                Icons.Default.Person,
-                                contentDescription = null,
-                                tint = MaterialTheme.colors.primary,
-                                modifier = Modifier.padding(16.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = "${patient?.firstName} ${patient?.lastName}",
-                            style = MaterialTheme.typography.h5,
-                            fontWeight = FontWeight.Bold
-                        )
-                        patient?.participantId?.let { pid ->
-                            Text(
-                                text = "ID: $pid",
-                                style = MaterialTheme.typography.body2,
-                                color = Color.Gray
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(24.dp)
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(
-                                    text = "${patient?.age ?: "—"}",
-                                    style = MaterialTheme.typography.h6,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text("Age", style = MaterialTheme.typography.caption, color = Color.Gray)
-                            }
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(
-                                    text = patient?.biologicalSex.takeIf { !it.isNullOrBlank() } ?: "—",
-                                    style = MaterialTheme.typography.h6,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text("Biological Sex", style = MaterialTheme.typography.caption, color = Color.Gray)
-                            }
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(
-                                    text = if (patient?.height != null && patient?.height != 0) "${patient?.height}\"" else "—",
-                                    style = MaterialTheme.typography.h6,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text("Height", style = MaterialTheme.typography.caption, color = Color.Gray)
-                            }
-                        }
-                    }
-                }
+            Spacer(modifier = Modifier.height(6.dp))
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = Color(0x33252542)
+            ) {
+                Text(
+                    text = patient.participantId ?: patient.id.toString(),
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = AppColors.TableHeaderText
+                )
             }
-
-            // Latest Score Summary
-            if (scoresWithReviews.isNotEmpty()) {
-                item {
-                    val latestScore = scoresWithReviews.last().score
-                    val scoreVal = latestScore.overallScore.toInt()
-                    Card(
-                        elevation = 4.dp,
-                        shape = RoundedCornerShape(12.dp),
-                        backgroundColor = if (scoreVal > 80) Color(0xFFE6F4EA) else Color(0xFFFCE8E6)
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(16.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                "Latest Gait Score",
-                                style = MaterialTheme.typography.caption,
-                                color = Color.Gray
-                            )
-                            Text(
-                                text = "$scoreVal",
-                                style = MaterialTheme.typography.h3,
-                                fontWeight = FontWeight.Bold,
-                                color = if (scoreVal > 80) Color(0xFF137333) else Color(0xFFC5221F)
-                            )
-                            Text(
-                                text = "out of 100",
-                                style = MaterialTheme.typography.body2,
-                                color = Color.Gray
-                            )
-                        }
-                    }
-                }
+            Divider(
+                color = AppColors.DividerMediumWhite,
+                thickness = 1.dp,
+                modifier = Modifier.padding(vertical = 14.dp)
+            )
+            Row(modifier = Modifier.fillMaxWidth()) {
+                DemoStatCell("AGE", "${patient.age ?: "—"} yr", Modifier.weight(1f))
+                DemoStatCell("GENDER", patient.biologicalSex.takeIf { it.isNotBlank() } ?: "—", Modifier.weight(1f))
+                DemoStatCell(
+                    "HEIGHT",
+                    heightDisplayInches(patient.height),
+                    Modifier.weight(1f)
+                )
+                DemoStatCell("ADDED", formatPatientAdded(patient), Modifier.weight(1.2f), valueFontSize = 12.sp)
             }
-
-            // Assessment History Title
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Assessments (${scoresWithReviews.size})", style = MaterialTheme.typography.h6)
-                    TextButton(onClick = onNavigateToCamera) {
-                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("New")
-                    }
-                }
-            }
-
-            if (scoresWithReviews.isEmpty()) {
-                item {
-                    Card(elevation = 2.dp, shape = RoundedCornerShape(8.dp)) {
-                        Box(
-                            modifier = Modifier.fillMaxWidth().padding(24.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("No assessments yet", style = MaterialTheme.typography.body1)
-                                Text(
-                                    "Tap '+' to start a new gait analysis",
-                                    style = MaterialTheme.typography.body2,
-                                    color = Color.Gray
-                                )
-                            }
-                        }
-                    }
-                }
-            } else {
-                items(scoresWithReviews.reversed()) { item ->
-                    AssessmentCard(
-                        score = item.score,
-                        isReviewed = item.review?.isReviewed == true,
-                        onClick = { onNavigateToResults(item.score.id) }
-                    )
-                }
+            Divider(
+                color = AppColors.DividerMediumWhite,
+                thickness = 1.dp,
+                modifier = Modifier.padding(vertical = 14.dp)
+            )
+            Row(modifier = Modifier.fillMaxWidth()) {
+                DemoStatCell(
+                    label = "ANALYSES",
+                    value = analysesCount.toString(),
+                    modifier = Modifier.weight(1f),
+                    valueColor = AppColors.TableHeaderText,
+                    valueFontSize = 18.sp
+                )
+                DemoStatCell(
+                    label = "LATEST SCORE",
+                    value = latestScoreText,
+                    modifier = Modifier.weight(1f),
+                    valueColor = latestScoreColor,
+                    valueFontSize = 18.sp
+                )
             }
         }
     }
 }
 
-@Composable
-private fun AssessmentCard(score: GaitScoreEntity, isReviewed: Boolean = false, onClick: () -> Unit) {
-    val overall = score.overallScore.toInt()
-    val dateStr = try {
-        val instant = Instant.fromEpochMilliseconds(score.recordedAt)
-        val local = instant.toLocalDateTime(TimeZone.currentSystemDefault())
-        "${local.month.name.take(3)} ${local.dayOfMonth}, ${local.year}"
-    } catch (e: Exception) {
-        "Unknown date"
-    }
+private fun heightDisplayInches(totalInches: Int): String {
+    if (totalInches == 0) return "—"
+    val feet = totalInches / 12
+    val inches = totalInches % 12
+    return "$feet'$inches\""
+}
 
+@Composable
+private fun DemoStatCell(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    valueColor: Color = AppColors.TextWhite,
+    valueFontSize: TextUnit = 14.sp
+) {
+    Column(modifier = modifier) {
+        Text(
+            text = label,
+            fontSize = 10.sp,
+            letterSpacing = 0.1.sp,
+            color = AppColors.ChartAxisText,
+            fontWeight = FontWeight.Medium
+        )
+        Text(
+            text = value,
+            fontSize = valueFontSize,
+            fontWeight = FontWeight.Bold,
+            color = valueColor
+        )
+    }
+}
+
+@Composable
+private fun ProgressChartPlaceholderCard(modifier: Modifier = Modifier) {
     Card(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
-        elevation = 2.dp,
-        shape = RoundedCornerShape(8.dp)
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        backgroundColor = AppColors.CardSurfaceDark,
+        elevation = 2.dp
     ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(220.dp)
+                .padding(16.dp),
+            contentAlignment = Alignment.Center
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text("Gait Analysis", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.subtitle1)
-                Text(dateStr, style = MaterialTheme.typography.caption, color = Color.Gray)
-                Spacer(modifier = Modifier.height(4.dp))
-                Surface(
-                    color = if (isReviewed) Color(0xFFE6F4EA) else Color(0xFFFFF3E0),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text(
-                        text = if (isReviewed) "✓ Reviewed" else "⏳ Pending Review",
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                        style = MaterialTheme.typography.caption,
-                        color = if (isReviewed) Color(0xFF137333) else Color(0xFFE65100)
-                    )
-                }
-            }
-            Surface(
-                color = if (overall > 80) Color(0xFFE6F4EA) else Color(0xFFFCE8E6),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Text(
-                    text = "Score: $overall",
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                    style = MaterialTheme.typography.caption,
-                    fontWeight = FontWeight.Bold,
-                    color = if (overall > 80) Color(0xFF137333) else Color(0xFFC5221F)
-                )
-            }
+            Text(
+                text = "Progress chart",
+                color = AppColors.ChartAxisText,
+                fontSize = 14.sp
+            )
         }
+    }
+}
+
+@Composable
+private fun ProfileActionsCard(
+    onNewAnalysis: () -> Unit,
+    onBatchAnalysis: () -> Unit,
+    onAnalysisHistory: () -> Unit,
+    onProgressOverTime: () -> Unit,
+    onEditPatient: () -> Unit,
+    onDeletePatient: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        backgroundColor = AppColors.CardSurfaceDark,
+        elevation = 3.dp
+    ) {
+        Column {
+            ProfileActionRow(
+                icon = Icons.Default.Movie,
+                iconTint = AppColors.IconGreen,
+                title = "New Gait Analysis",
+                chevronTint = AppColors.IconGreen,
+                onClick = onNewAnalysis
+            )
+            Divider(color = AppColors.DividerLightWhite, thickness = 1.dp)
+            ProfileActionRow(
+                icon = Icons.Default.Folder,
+                iconTint = AppColors.IconPurple,
+                title = "Batch Analysis",
+                chevronTint = AppColors.IconPurple,
+                onClick = onBatchAnalysis
+            )
+            Divider(color = AppColors.DividerLightWhite, thickness = 1.dp)
+            ProfileActionRow(
+                icon = Icons.Default.History,
+                iconTint = AppColors.IconLightBlue,
+                title = "Analysis History",
+                chevronTint = AppColors.IconLightBlue,
+                onClick = onAnalysisHistory
+            )
+            Divider(color = AppColors.DividerLightWhite, thickness = 1.dp)
+            ProfileActionRow(
+                icon = Icons.Default.ShowChart,
+                iconTint = AppColors.IconLightBlue,
+                title = "Progress Over Time",
+                chevronTint = AppColors.IconLightBlue,
+                onClick = onProgressOverTime
+            )
+            Divider(color = AppColors.DividerLightWhite, thickness = 1.dp)
+            ProfileActionRow(
+                icon = Icons.Default.Edit,
+                iconTint = AppColors.ChartAxisText,
+                title = "Edit Patient Record",
+                titleColor = Color(0xFFCCCCCC),
+                chevronTint = AppColors.ChartAxisText,
+                onClick = onEditPatient
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Divider(color = AppColors.DividerMediumWhite, thickness = 1.dp)
+            Spacer(modifier = Modifier.height(8.dp))
+            ProfileActionRow(
+                icon = Icons.Default.Delete,
+                iconTint = AppColors.ScorePoor,
+                title = "Delete Patient Record",
+                titleColor = AppColors.ScorePoor,
+                chevronTint = AppColors.ScorePoor,
+                onClick = onDeletePatient
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProfileActionRow(
+    icon: ImageVector,
+    iconTint: Color,
+    title: String,
+    titleColor: Color = AppColors.TextWhite,
+    chevronTint: Color,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 20.dp, vertical = 18.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(22.dp))
+        Spacer(modifier = Modifier.size(16.dp))
+        Text(title, modifier = Modifier.weight(1f), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = titleColor)
+        Icon(
+            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            tint = chevronTint,
+            modifier = Modifier.size(18.dp)
+        )
     }
 }

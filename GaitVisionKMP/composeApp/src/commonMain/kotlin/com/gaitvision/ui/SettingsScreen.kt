@@ -15,17 +15,23 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.gaitvision.data.AppDatabase
+import kotlinx.coroutines.launch
 
 @Composable
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
     onNavigateToHelp: () -> Unit,
     onNavigateToInfo: () -> Unit,
-    onNavigateToCsv: () -> Unit
+    database: AppDatabase,
+    onNavigateToCsvExport: (Long) -> Unit,
+    onNavigateToAuditLog: () -> Unit
 ) {
     var notificationEnabled by remember { mutableStateOf(true) }
     val systemDark = isSystemInDarkTheme()
     var darkThemeEnabled by remember { mutableStateOf(ThemeConfig.isDarkMode ?: systemDark) }
+    var csvExportHint by remember { mutableStateOf<String?>(null) }
+    val scope = rememberSafeCoroutineScope()
 
     Scaffold(
         topBar = {
@@ -59,22 +65,45 @@ fun SettingsScreen(
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
             }
-            
+
             item {
                 SettingSwitchRow(title = "Enable Notifications", checked = notificationEnabled) {
                     notificationEnabled = it
                 }
             }
-            
+
             item {
                 SettingSwitchRow(title = "Dark Theme", checked = darkThemeEnabled) {
                     darkThemeEnabled = it
                     ThemeConfig.isDarkMode = it
                 }
             }
-            
+
             item {
-                SettingActionRow(title = "Data / CSV", onClick = onNavigateToCsv)
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    SettingActionRow(
+                        title = "Data / CSV",
+                        onClick = {
+                            scope.launch {
+                                val latest = database.gaitScoreDao().getLatestScoreGlobally()
+                                if (latest != null) {
+                                    csvExportHint = null
+                                    onNavigateToCsvExport(latest.id)
+                                } else {
+                                    csvExportHint = "No analysis data yet — run an analysis first."
+                                }
+                            }
+                        }
+                    )
+                    csvExportHint?.let { hint ->
+                        Text(
+                            text = hint,
+                            style = MaterialTheme.typography.caption,
+                            color = MaterialTheme.colors.error,
+                            modifier = Modifier.padding(start = 4.dp, top = 6.dp)
+                        )
+                    }
+                }
             }
 
             item {
@@ -111,7 +140,7 @@ fun SettingsScreen(
             }
 
             item {
-                SettingActionRow(title = "HIPAA Audit Log", onClick = { /* TODO */ })
+                SettingActionRow(title = "HIPAA Audit Log", onClick = onNavigateToAuditLog)
             }
 
             item {
@@ -127,11 +156,11 @@ fun SettingsScreen(
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
             }
-            
+
             item {
                 SettingActionRow(title = "Help / FAQ", onClick = onNavigateToHelp)
             }
-            
+
             item {
                 SettingActionRow(title = "App Information", onClick = onNavigateToInfo)
             }

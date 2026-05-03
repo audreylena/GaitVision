@@ -99,7 +99,7 @@ fun CameraScreen(
                 isProcessing = true
                 scope.launch {
                     try {
-                        val outputPath = path.substringBeforeLast(".") + "_processed.mp4"
+                        val outputPath = videoProcessor.processedVideoOutputPath(path)
                         val videoId = database.videoDao().insertVideo(
                             VideoEntity(
                                 patientId = resolvedPatientId,
@@ -218,9 +218,10 @@ fun CameraScreen(
                 
                 Spacer(modifier = Modifier.height(16.dp))
                 
-                // Recording Date Input
+                // Legacy Android camera/quick flows do not expose a recording-date picker;
+                // timestamps are stored when the analysis is saved.
                 Card(
-                    modifier = Modifier.fillMaxWidth().clickable { /* TODO: Date Picker */ },
+                    modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     backgroundColor = MaterialTheme.colors.surface,
                     elevation = 0.dp
@@ -229,13 +230,16 @@ fun CameraScreen(
                         modifier = Modifier.padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Default.DateRange, contentDescription = "Date", tint = PrimaryBlue, modifier = Modifier.size(28.dp))
+                        Icon(Icons.Default.DateRange, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(28.dp))
                         Spacer(modifier = Modifier.width(16.dp))
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Recording Date", style = MaterialTheme.typography.caption, color = TextSlate)
-                            Text("Today", style = MaterialTheme.typography.subtitle1.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colors.onSurface)
+                            Text("Recording time", style = MaterialTheme.typography.caption, color = TextSlate)
+                            Text(
+                                "Saved automatically when analysis completes",
+                                style = MaterialTheme.typography.body2,
+                                color = MaterialTheme.colors.onSurface.copy(alpha = 0.85f)
+                            )
                         }
-                        Icon(Icons.Default.Create, contentDescription = "Edit", tint = PrimaryBlue, modifier = Modifier.size(24.dp))
                     }
                 }
                 Spacer(modifier = Modifier.height(32.dp))

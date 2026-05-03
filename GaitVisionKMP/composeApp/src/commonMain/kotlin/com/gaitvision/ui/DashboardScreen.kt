@@ -1,33 +1,48 @@
 package com.gaitvision.ui
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.*
+import androidx.compose.material.Card
+import androidx.compose.material.Icon
+import androidx.compose.material.MaterialTheme
+import androidx.compose.material.Scaffold
+import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.DirectionsWalk
+import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gaitvision.data.AppDatabase
-import com.gaitvision.data.VideoEntity
-import com.gaitvision.logic.GaitAnalyzer
-import com.gaitvision.platform.FilePicker
 import com.gaitvision.platform.VideoProcessor
-import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 
 @Composable
 fun DashboardScreen(
@@ -43,199 +58,189 @@ fun DashboardScreen(
     onNavigateToInfo: () -> Unit = {},
     onNavigateToCreatePatient: () -> Unit = {}
 ) {
-    val scope = rememberSafeCoroutineScope()
-    val analyzer = remember { GaitAnalyzer() }
-    var isProcessing by remember { mutableStateOf(false) }
-    var progress by remember { mutableStateOf(0) }
-    var showPatientPicker by remember { mutableStateOf(false) }
-    var pendingAction by remember { mutableStateOf<String?>(null) } // "camera" or "upload"
-
     val recentPatients by database.patientDao().getAllPatientsFlow().collectAsState(initial = emptyList())
 
-    if (showPatientPicker) {
-        AlertDialog(
-            onDismissRequest = { showPatientPicker = false },
-            title = { Text("Select Patient") },
-            backgroundColor = MaterialTheme.colors.surface,
-            text = {
-                LazyColumn {
-                    items(recentPatients) { patient ->
-                        TextButton(
-                            onClick = {
-                                showPatientPicker = false
-                                when (pendingAction) {
-                                    "camera" -> onNavigateToCamera(patient.id)
-                                    "upload" -> { }
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("${patient.firstName} ${patient.lastName}", color = MaterialTheme.colors.onSurface)
-                        }
-                    }
-                }
-            },
-            buttons = {
-                TextButton(onClick = { showPatientPicker = false }) { Text("Cancel", color = PrimaryBlue) }
-            }
-        )
-    }
-
     Scaffold(
-        backgroundColor = MaterialTheme.colors.background,
+        backgroundColor = Color.Transparent,
         bottomBar = {
-            BottomNavigation(backgroundColor = MaterialTheme.colors.surface, elevation = 8.dp) {
-                BottomNavigationItem(
-                    selected = true,
-                    onClick = { /* Already here */ },
-                    icon = { Icon(Icons.Default.Home, contentDescription = "Home") },
-                    label = { Text("Home", fontSize = 10.sp) },
-                    selectedContentColor = PrimaryBlue,
-                    unselectedContentColor = TextSlate
-                )
-                BottomNavigationItem(
-                    selected = false,
-                    onClick = onNavigateToHelp,
-                    icon = { Icon(Icons.Default.Info, contentDescription = "Help") },
-                    label = { Text("Help", fontSize = 10.sp) },
-                    selectedContentColor = PrimaryBlue,
-                    unselectedContentColor = TextSlate
-                )
-                BottomNavigationItem(
-                    selected = false,
-                    onClick = onNavigateToInfo,
-                    icon = { Icon(Icons.Default.Info, contentDescription = "Info") },
-                    label = { Text("Info", fontSize = 10.sp) },
-                    selectedContentColor = PrimaryBlue,
-                    unselectedContentColor = TextSlate
-                )
-                BottomNavigationItem(
-                    selected = false,
-                    onClick = onNavigateToSettings,
-                    icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
-                    label = { Text("Settings", fontSize = 10.sp) },
-                    selectedContentColor = PrimaryBlue,
-                    unselectedContentColor = TextSlate
-                )
-            }
+            LegacyDashboardBottomNav(
+                selectedTab = DashboardNavTab.Home,
+                onHome = { },
+                onHelp = onNavigateToHelp,
+                onInfo = onNavigateToInfo,
+                onSettings = onNavigateToSettings
+            )
         }
     ) { paddingValues ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            AppColors.DashboardGradientTop,
+                            AppColors.DashboardGradientBottom
+                        )
+                    )
+                )
                 .padding(paddingValues)
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Top
         ) {
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Application Logo placeholder
-            Box(
+            Column(
                 modifier = Modifier
-                    .size(80.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colors.surface),
-                contentAlignment = Alignment.Center
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Icon(Icons.Default.Person, contentDescription = "Logo", modifier = Modifier.size(50.dp), tint = PrimaryBlue)
-            }
-            Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(32.dp))
 
-            // Welcome Section
-            Text(
-                text = "GaitVision",
-                style = MaterialTheme.typography.h4.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colors.onBackground
-            )
-            Text(
-                text = "Good evening!",
-                style = MaterialTheme.typography.body1,
-                color = TextSlate,
-                modifier = Modifier.padding(top = 4.dp, bottom = 32.dp)
-            )
-
-            // Action Cards
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                DashboardActionCard(
-                    title = "Search",
-                    subtitle = "Find Patient",
-                    icon = Icons.Default.Search,
-                    iconColor = PrimaryBlue,
-                    onClick = onNavigateToPatientList,
-                    modifier = Modifier.weight(1f)
+                Icon(
+                    Icons.Default.Person,
+                    contentDescription = "GaitVision logo",
+                    modifier = Modifier.size(64.dp),
+                    tint = AppColors.PrimaryBlue
                 )
-                DashboardActionCard(
-                    title = "New",
-                    subtitle = "Add Patient",
-                    icon = Icons.Default.Add,
-                    iconColor = AccentGreen,
-                    onClick = onNavigateToCreatePatient,
-                    modifier = Modifier.weight(1f)
+
+                Text(
+                    text = "GaitVision",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = AppColors.TextWhite,
+                    modifier = Modifier.padding(top = 8.dp)
                 )
-            }
 
-            Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = dashboardGreeting(),
+                    fontSize = 14.sp,
+                    color = AppColors.TextMutedGray,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
 
-            // Quick Analysis Bar
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(onClick = { onNavigateToCamera(0L) }),
-                backgroundColor = MaterialTheme.colors.surface,
-                shape = RoundedCornerShape(12.dp)
-            ) {
+                Spacer(modifier = Modifier.height(32.dp))
+
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(16.dp)
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    Icon(Icons.Default.Person, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(28.dp))
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Quick Analysis", style = MaterialTheme.typography.subtitle1.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colors.onSurface)
-                        Text("Analyze gait without creating a patient profile", style = MaterialTheme.typography.caption, color = TextSlate)
-                    }
-                    Icon(Icons.Default.KeyboardArrowRight, contentDescription = null, tint = TextSlate)
-                }
-            }
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // Recent Patients Section
-            Text(
-                text = "Recent Patients",
-                style = MaterialTheme.typography.h6.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colors.onBackground,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
-            )
-
-            if (recentPatients.isEmpty()) {
-                Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                    Text(
-                        text = "No recent patients",
-                        style = MaterialTheme.typography.body1,
-                        color = TextSlate
+                    DashboardActionCard(
+                        title = "Search",
+                        subtitle = "Find Patient",
+                        icon = Icons.Default.Search,
+                        iconTint = AppColors.PrimaryBlue,
+                        onClick = onNavigateToPatientList,
+                        modifier = Modifier.weight(1f)
+                    )
+                    DashboardActionCard(
+                        title = "New",
+                        subtitle = "Add Patient",
+                        icon = Icons.Default.PersonAdd,
+                        iconTint = AppColors.AccentEmerald,
+                        onClick = onNavigateToCreatePatient,
+                        modifier = Modifier.weight(1f)
                     )
                 }
-            } else {
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth().weight(1f)
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onNavigateToCamera(0L) },
+                    backgroundColor = AppColors.CardSurfaceDark,
+                    shape = RoundedCornerShape(12.dp),
+                    elevation = 0.dp
                 ) {
-                    items(recentPatients.take(5)) { patient ->
-                        PatientCard(
-                            name = "${patient.firstName} ${patient.lastName}",
-                            date = "Age: ${patient.age ?: "N/A"}",
-                            score = 0,
-                            onClick = { onNavigateToPatientProfile(patient.id) }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.DirectionsWalk,
+                            contentDescription = null,
+                            tint = AppColors.SecondaryTeal,
+                            modifier = Modifier.size(32.dp)
+                        )
+                        Spacer(modifier = Modifier.size(16.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "Quick Analysis",
+                                style = MaterialTheme.typography.subtitle1,
+                                fontWeight = FontWeight.Bold,
+                                color = AppColors.TextWhite
+                            )
+                            Text(
+                                "Analyze gait without creating a patient profile",
+                                style = MaterialTheme.typography.caption,
+                                color = AppColors.TextMutedGray,
+                                fontSize = 12.sp
+                            )
+                        }
+                        Icon(
+                            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = AppColors.TextTertiary
                         )
                     }
                 }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Text(
+                    text = "Recent Patients",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = AppColors.TextWhite,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 4.dp, bottom = 16.dp)
+                )
+
+                if (recentPatients.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "No recent patients",
+                            style = MaterialTheme.typography.body1,
+                            color = AppColors.TableHeaderGray
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                    ) {
+                        items(recentPatients.take(5)) { patient ->
+                            val idLine = patient.participantId?.let { "ID: $it" } ?: "ID: ${patient.id}"
+                            val agePart = patient.age?.let { "$it yrs" } ?: "—"
+                            RecentPatientRowCard(
+                                patientName = "${patient.firstName} ${patient.lastName}".trim(),
+                                detailLine = "$idLine · $agePart",
+                                onClick = { onNavigateToPatientProfile(patient.id) },
+                                modifier = Modifier.padding(horizontal = 4.dp)
+                            )
+                        }
+                    }
+                }
             }
         }
+    }
+}
+
+private fun dashboardGreeting(): String {
+    val hour = try {
+        Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).hour
+    } catch (_: Exception) {
+        12
+    }
+    return when {
+        hour < 12 -> "Good Morning!"
+        hour < 17 -> "Good Afternoon!"
+        else -> "Good Evening!"
     }
 }
 
@@ -244,75 +249,50 @@ fun DashboardActionCard(
     title: String,
     subtitle: String,
     icon: ImageVector,
-    iconColor: Color,
+    iconTint: Color,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
         modifier = modifier
-            .height(140.dp)
             .clickable(onClick = onClick),
         elevation = 0.dp,
-        shape = RoundedCornerShape(16.dp),
-        backgroundColor = MaterialTheme.colors.surface
+        shape = RoundedCornerShape(12.dp),
+        backgroundColor = AppColors.CardSurfaceDark
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
-            modifier = Modifier.padding(16.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp)
         ) {
             Box(
                 modifier = Modifier
                     .size(48.dp)
-                    .clip(CircleShape)
-                    .background(Color.White),
+                    .background(Color.White, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = iconColor,
-                    modifier = Modifier.size(24.dp)
+                    tint = iconTint,
+                    modifier = Modifier.size(28.dp)
                 )
             }
             Spacer(modifier = Modifier.height(12.dp))
-            Text(title, style = MaterialTheme.typography.subtitle1.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colors.onSurface)
-            Text(subtitle, style = MaterialTheme.typography.caption, color = TextSlate)
-        }
-    }
-}
-
-@Composable
-fun PatientCard(name: String, date: String, score: Int, onClick: () -> Unit = {}) {
-    Card(
-        elevation = 0.dp,
-        backgroundColor = MaterialTheme.colors.surface,
-        shape = RoundedCornerShape(12.dp),
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Column {
-                Text(name, style = MaterialTheme.typography.subtitle1.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colors.onSurface)
-                Text(date, style = MaterialTheme.typography.caption, color = TextSlate)
-            }
-            if (score > 0) {
-                Surface(
-                    color = if (score > 80) Color(0xFFE6F4EA) else Color(0xFFFCE8E6),
-                    shape = RoundedCornerShape(16.dp)
-                ) {
-                    Text(
-                        text = "Score: $score",
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                        style = MaterialTheme.typography.caption,
-                        fontWeight = FontWeight.Bold,
-                        color = if (score > 80) Color(0xFF137333) else Color(0xFFC5221F)
-                    )
-                }
-            }
+            Text(
+                title,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = AppColors.TextWhite
+            )
+            Text(
+                subtitle,
+                fontSize = 12.sp,
+                color = AppColors.TextMutedGray,
+                modifier = Modifier.padding(top = 4.dp)
+            )
         }
     }
 }

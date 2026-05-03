@@ -26,6 +26,11 @@ GaitVision is an Android application focused on improving access to gait analysi
 The application implements a video-based gait analysis pipeline on Android (API 24+). It extracts pose landmarks from video frames, computes gait signals, detects stride cycles, and calculates 16 clinical features across temporal, spatial, kinematic, and smoothness domains.
 
 Three machine learning models (Autoencoder, PCA, Ridge Regression) provide gait quality assessments, achieving >0.97 AUC for normal vs impaired classification.
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/48f1214e-0ade-47ec-9052-ff6d5ccfbb57" width="30%" />
+  <img src="https://github.com/user-attachments/assets/93b9cd79-4684-49b5-b0a9-438c131036f2" width="30%" />
+  <img src="https://github.com/user-attachments/assets/b719c49b-11d2-4798-9e55-e3f73793aa6a" width="30%" />
+</p>
 
 ---
 

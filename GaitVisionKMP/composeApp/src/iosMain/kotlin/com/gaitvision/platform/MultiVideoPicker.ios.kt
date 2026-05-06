@@ -13,7 +13,7 @@ import platform.darwin.NSObject
  * Batch video selection via the system Files / iCloud document picker (multiple movie files).
  * Matches [FilePicker] patterns so paths are sandbox-safe copy URLs suitable for [IOSVideoProcessor].
  */
-actual class MultiVideoPicker {
+actual class MultiVideoPicker actual constructor() {
 
     private var callback: ((List<String>) -> Unit)? = null
 

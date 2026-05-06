@@ -5,7 +5,7 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 
-actual class MultiVideoPicker {
+actual class MultiVideoPicker actual constructor() {
 
     private var launcher: androidx.activity.result.ActivityResultLauncher<PickVisualMediaRequest>? = null
 

@@ -226,11 +226,11 @@ class ResultsActivity : BaseActivity() {
 
     private fun getScoreLabel(score: Double): String {
         return when {
-            score >= 90 -> "Excellent Gait"
-            score >= 80 -> "Good Gait"
-            score >= 70 -> "Fair Gait"
-            score >= 60 -> "Moderate Impairment"
-            score >= 50 -> "Notable Impairment"
+            score >= 85 -> "Excellent Gait"
+            score >= 70 -> "Good Gait"
+            score >= 55 -> "Fair Gait"
+            score >= 40 -> "Moderate Impairment"
+            score >= 25 -> "Notable Impairment"
             else -> "Significant Impairment"
         }
     }
@@ -238,8 +238,8 @@ class ResultsActivity : BaseActivity() {
     private fun getScoreColor(score: Float): Int {
         if (score.isNaN()) return android.graphics.Color.GRAY
         return when {
-            score >= 80 -> android.graphics.Color.parseColor("#4CAF50")
-            score >= 60 -> android.graphics.Color.parseColor("#FF9800")
+            score >= 70 -> android.graphics.Color.parseColor("#4CAF50")
+            score >= 40 -> android.graphics.Color.parseColor("#FF9800")
             else -> android.graphics.Color.parseColor("#F44336")
         }
     }

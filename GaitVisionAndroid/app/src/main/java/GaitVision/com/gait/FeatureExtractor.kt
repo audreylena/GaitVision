@@ -95,8 +95,7 @@ class FeatureExtractor(
         }
         
         // =====================================================================
-        // FULL PIPELINE DEBUG - Compare with PC (controlled by enableVerboseLogging)
-        // =====================================================================
+        // FULL PIPELINE DEBUG - Compare with PC (controlled by enableVerboseLogging) // =====================================================================
         
         // Step 1: Compute signals
         var signals = computeSignals(poseSeq)
@@ -109,7 +108,10 @@ class FeatureExtractor(
         
         // Step 4: Compute velocities
         signals = computeVelocities(signals, poseSeq.fps)
-        
+        emaSmoothGapAware(signals.ankleLeftVy, emaAlpha, maxInterpGap)
+        emaSmoothGapAware(signals.ankleRightVy, emaAlpha, maxInterpGap)
+        emaSmoothGapAware(signals.hipAvgVy, emaAlpha, maxInterpGap)
+
         // Step 5: Determine near leg
         val nearLeg = determineNearLeg(poseSeq)
         

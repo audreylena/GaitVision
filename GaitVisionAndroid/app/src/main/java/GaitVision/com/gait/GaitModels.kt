@@ -19,7 +19,7 @@ object GaitConfig {
     // Feature extractor params
     const val MIN_CONFIDENCE = 0.32f
     const val MAX_INTERP_GAP = 5
-    const val EMA_ALPHA = 0.68f
+    const val EMA_ALPHA = 0.4f
     const val MIN_STEP_TIME_S = 0.32f
     const val MAX_STEP_TIME_S = 1.70f
     const val STEP_DISTANCE_FACTOR = 0.41f

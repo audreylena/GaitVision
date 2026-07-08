@@ -66,6 +66,8 @@ private var uBytesCache: ByteArray? = null
 private var vBytesCache: ByteArray? = null
 private var pixelsCache: IntArray? = null
 private var bitmapCache: Bitmap? = null
+private val smoothedKps = Array(33) { FloatArray(2) { Float.NaN } }
+private const val KP_EMA_ALPHA = 0.2f
 
 private fun imageToBitmap(image: Image): Bitmap {
     val width = image.width
@@ -370,6 +372,17 @@ private class EncoderState(
  */
 private fun processFrame(frame: Bitmap, frameIndex: Int): Bitmap {
     val poseFrame = processFrameWithMediaPipe(frame, frameIndex)
+    if (poseFrame != null) {
+        for (i in poseFrame.keypoints.indices) {
+            for (j in 0..1) {
+                val raw = poseFrame.keypoints[i][j]
+                val prev = smoothedKps[i][j]
+                smoothedKps[i][j] = if (prev.isNaN()) raw
+                    else KP_EMA_ALPHA * raw + (1f - KP_EMA_ALPHA) * prev
+                poseFrame.keypoints[i][j] = smoothedKps[i][j]
+            }
+        }
+    }
     val modifiedBitmap = drawOnBitmapMediaPipe(frame, poseFrame)
     if (poseFrame != null) {
         AnalysisSession.poseFrames.add(poseFrame)
@@ -478,6 +491,7 @@ suspend fun ProcVidEmpty(
     // Clear all data
     AnalysisSession.poseFrames.clear()
     AnalysisSession.frameList.clear()
+    smoothedKps.forEach { it.fill(Float.NaN) }
     AnalysisSession.extractedFeatures = null
     AnalysisSession.extractionDiagnostics = null
     AnalysisSession.scoringResult = null
@@ -725,7 +739,8 @@ suspend fun ProcVidEmpty(
     val frameCount = AnalysisSession.poseFrames.size
     AnalysisSession.frameList.clear()
     AnalysisSession.poseFrames.clear()
-    
+    smoothedKps.forEach { it.fill(Float.NaN) }
+
     // Release reusable YUV conversion buffers
     bitmapCache?.recycle()
     bitmapCache = null

@@ -400,3 +400,26 @@ data class Signals(
         return result
     }
 }
+
+@Parcelize
+data class BackGaitFeatures(
+    val cadence_spm: Float,
+    val hip_drop_mean: Float,
+    val hip_drop_std: Float,
+    val hip_sway_std: Float,
+    val stride_width_mean: Float,
+    val stride_width_cv: Float,
+    val step_width_asymmetry: Float,
+    val knee_separation_mean: Float,
+    val trunk_lean_mean: Float,
+    val trunk_lean_std: Float,
+    val valid_stride_count: Int
+) : Parcelable {
+    fun toFeatureArray(): FloatArray {
+        return floatArrayOf(
+            cadence_spm, hip_drop_mean, hip_drop_std, hip_sway_std,
+            stride_width_mean, stride_width_cv, step_width_asymmetry,
+            knee_separation_mean, trunk_lean_mean, trunk_lean_std
+        )
+    }
+}

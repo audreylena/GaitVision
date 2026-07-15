@@ -1073,7 +1073,10 @@ suspend fun ProcVidEmpty(
     
     // Feature extraction (uses poseFrames which is small)
     extractGaitFeatures(context, width, height, frameIndex, onProgress)
-    
+
+    // Snapshot pose frames before they get cleared below (multiview flow reads this)
+    AnalysisSession.lastPoseFramesSnapshot = AnalysisSession.poseFrames.toList()
+
     // Free heavy memory now that processing is done
     val frameCount = AnalysisSession.poseFrames.size
     AnalysisSession.rawPoseFrames.clear()

@@ -25,6 +25,8 @@ object AnalysisSession {
     val rawPoseFrames: MutableList<PoseFrame> = mutableListOf()
     val poseFrames: MutableList<PoseFrame> = mutableListOf()
 
+    var lastPoseFramesSnapshot: List<PoseFrame> = emptyList()
+
     // Extracted gait features (16 features matching PC pipeline)
     var extractedFeatures: GaitFeatures? = null
     var extractionDiagnostics: GaitDiagnostics? = null

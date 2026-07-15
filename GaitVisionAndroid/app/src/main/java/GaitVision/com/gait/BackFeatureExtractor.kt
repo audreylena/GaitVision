@@ -3,6 +3,7 @@ package GaitVision.com.gait
 import GaitVision.com.mediapipe.MediaPipePoseBackend
 import GaitVision.com.mediapipe.PoseSequence
 import kotlin.math.*
+import android.util.Log
 
 /**
  * Back-view (posterior) gait feature extractor.
@@ -23,6 +24,15 @@ class BackFeatureExtractor(
     }
 
     fun extract(poseSeq: PoseSequence): BackGaitFeatures? {
+        Log.d("GaitDebug", "BackFeatureExtractor: frames=${poseSeq.frames.size}, numFramesTotal=${poseSeq.numFramesTotal}, detectionRate=${poseSeq.detectionRate}")
+        if (poseSeq.frames.size < 20) {
+            Log.d("GaitDebug", "BackFeatureExtractor: FAILED - too few frames")
+            return null
+        }
+        if (poseSeq.detectionRate < 0.3f) {
+            Log.d("GaitDebug", "BackFeatureExtractor: FAILED - low detection rate")
+            return null
+        }
         if (poseSeq.frames.size < 20) return null
         if (poseSeq.detectionRate < 0.3f) return null
 
@@ -88,6 +98,8 @@ class BackFeatureExtractor(
 
         // Normalize by hip width to cancel depth/perspective drift
         val ankleSep = FloatArray(n) { ankleSepRaw[it] / (hipW[it] + 1e-8f) }
+        val ankleSepValid = ankleSep.filter { !it.isNaN() }
+        Log.d("GaitDebug", "BackFeatureExtractor: ankleSep valid=${ankleSepValid.size}, min=${ankleSepValid.minOrNull()}, max=${ankleSepValid.maxOrNull()}, mean=${ankleSepValid.average()}, std=${ankleSepValid.std()}")
         val kneeSep = FloatArray(n) { kneeSepRaw[it] / (hipW[it] + 1e-8f) }
 
         // Trunk lean angle - scale-invariant since it's an arctan ratio
@@ -96,7 +108,11 @@ class BackFeatureExtractor(
         }
 
         val steps = detectSteps(ankleSep, poseSeq.fps)
-        if (steps.size < 4) return null
+        Log.d("GaitDebug", "BackFeatureExtractor: detected ${steps.size} steps")
+        if (steps.size < 4) {
+            Log.d("GaitDebug", "BackFeatureExtractor: FAILED - insufficient steps")
+            return null
+        }
 
         val stepTimes = steps.map { it / poseSeq.fps }
         data class StrideRange(val start: Int, val end: Int)
@@ -208,6 +224,7 @@ class BackFeatureExtractor(
         val minDistance = max((fps * minStepTimeS).toInt(), 5)
         val std = valid.std()
         val prominence = std * 0.33f
+        Log.d("GaitDebug", "detectSteps: validCount=${valid.size}, std=$std, prominence=$prominence, minDistance=$minDistance")
 
         val peaks = mutableListOf<Int>()
         var i = 1

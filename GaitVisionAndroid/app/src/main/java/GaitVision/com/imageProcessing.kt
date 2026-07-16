@@ -35,7 +35,9 @@ import GaitVision.com.mediapipe.PoseFrame
 import GaitVision.com.mediapipe.PoseSequence
 import GaitVision.com.mediapipe.MediaPipeResultConverter
 import GaitVision.com.mediapipe.PoseOneEuroSmoother
+import GaitVision.com.mediapipe.PoseEngine
 import GaitVision.com.mediapipe.ROITracker
+import GaitVision.com.mediapipe.RtmPoseBackend
 
 // Gait analysis imports
 import GaitVision.com.gait.FeatureExtractor
@@ -187,6 +189,7 @@ fun plotLineGraph(
  */
 private var mediaPipeBackend: MediaPipePoseBackend? = null
 private var roiMediaPipeBackend: MediaPipePoseBackend? = null
+private var rtmPoseBackend: RtmPoseBackend? = null
 
 /**
  * Tracks leg-label identity across frames. State resets per processing session.
@@ -268,6 +271,26 @@ private fun correctAndMaybeSmoothPose(frame: PoseFrame, fps: Float = detectedFps
         }
         corrected to output
     }
+}
+
+private fun smoothRtmPose(frame: PoseFrame, fps: Float = detectedFps): Pair<PoseFrame, PoseFrame> {
+    val fallbackDt = 1f / sanitizeFps(fps)
+    val dt = previousPoseTimestampS
+        ?.let { frame.timestampS - it }
+        ?.takeIf { it.isFinite() && it in (1f / 240f)..(1f / 1f) }
+        ?: fallbackDt
+    previousPoseTimestampS = frame.timestampS
+
+    val smoothed = if (enablePositionSmoothing) {
+        poseSmoother.smooth(
+            frame = frame,
+            dt = dt,
+            minConfidence = GaitConfig.MIN_CONFIDENCE_RTMPOSE
+        )
+    } else {
+        frame
+    }
+    return frame to smoothed
 }
 
 /**
@@ -403,6 +426,32 @@ fun releaseMediaPipeBackend() {
     Log.d("ImageProcessing", "MediaPipe backends released")
 }
 
+private fun initializePoseEngine(context: Context, poseEngine: PoseEngine) {
+    when (poseEngine) {
+        PoseEngine.MEDIAPIPE -> initializeMediaPipeBackend(context)
+        PoseEngine.RTMPOSE -> {
+            if (rtmPoseBackend == null) {
+                rtmPoseBackend = RtmPoseBackend.fromAssets(
+                    context = context.applicationContext,
+                    benchmarkEnabled = false
+                )
+                Log.d("ImageProcessing", "RTMPose-s + YOLOX backend initialized")
+            }
+        }
+    }
+}
+
+private fun releasePoseEngine(poseEngine: PoseEngine) {
+    when (poseEngine) {
+        PoseEngine.MEDIAPIPE -> releaseMediaPipeBackend()
+        PoseEngine.RTMPOSE -> {
+            rtmPoseBackend?.close()
+            rtmPoseBackend = null
+            Log.d("ImageProcessing", "RTMPose-s + YOLOX backend released")
+        }
+    }
+}
+
 
 /**
  * Holds mutable state for video encoding across frames.
@@ -526,15 +575,28 @@ private fun processFrame(
     context: Context,
     frame: Bitmap,
     frameIndex: Int,
-    presentationTimeUs: Long? = null
+    presentationTimeUs: Long? = null,
+    poseEngine: PoseEngine
 ): Bitmap {
-    val rawPoseFrame = processFrameWithAdaptiveRoi(
-        context = context,
-        frame = frame,
-        frameIndex = frameIndex,
-        presentationTimeUs = presentationTimeUs
-    )
-    val poseFrames = rawPoseFrame?.let { correctAndMaybeSmoothPose(it) }
+    val poseFrames = when (poseEngine) {
+        PoseEngine.MEDIAPIPE -> {
+            val rawPoseFrame = processFrameWithAdaptiveRoi(
+                context = context,
+                frame = frame,
+                frameIndex = frameIndex,
+                presentationTimeUs = presentationTimeUs
+            )
+            rawPoseFrame?.let { correctAndMaybeSmoothPose(it) }
+        }
+        PoseEngine.RTMPOSE -> {
+            val timestampMs = presentationTimeUs
+                ?.let { (it / 1000.0).roundToLong() }
+                ?: frameTimestampMs(frameIndex, detectedFps)
+            rtmPoseBackend
+                ?.detectPose(frame, frameIndex, timestampMs)
+                ?.let { smoothRtmPose(it) }
+        }
+    }
     val poseFrame = poseFrames?.second
     val modifiedBitmap = drawOnBitmapMediaPipe(frame, poseFrame)
     if (poseFrames != null) {
@@ -806,6 +868,7 @@ private fun logAdaptiveRoiStats(tag: String, totalFrames: Int) {
 suspend fun ProcVidEmpty(
     context: Context,
     outputPath: String,
+    poseEngine: PoseEngine = PoseEngine.MEDIAPIPE,
     onProgress: ProgressReporter? = null
 ): Uri? {
     val TAG = "ImageProcessing"
@@ -923,11 +986,18 @@ suspend fun ProcVidEmpty(
         Log.e(TAG, "Falling back to slow getFrameAtTime method")
         extractor.release()
         // Fallback to slow method
-        return procVidEmptyFallback(context, outputPath, onProgress)
+        return procVidEmptyFallback(context, outputPath, poseEngine, onProgress)
     }
     
-    // Initialize MediaPipe
-    initializeMediaPipeBackend(context)
+    try {
+        initializePoseEngine(context, poseEngine)
+    } catch (e: Exception) {
+        Log.e(TAG, "Failed to initialize $poseEngine backend: ${e.message}", e)
+        decoder.stop()
+        decoder.release()
+        extractor.release()
+        return null
+    }
     
     // === Set up video encoder ===
     val mediaMuxer: MediaMuxer
@@ -950,7 +1020,7 @@ suspend fun ProcVidEmpty(
         encoder.start()
     } catch (e: Exception) {
         Log.e(TAG, "Failed to initialize encoder: ${e.message}", e)
-        releaseMediaPipeBackend()
+        releasePoseEngine(poseEngine)
         decoder.stop()
         decoder.release()
         extractor.release()
@@ -971,7 +1041,7 @@ suspend fun ProcVidEmpty(
     val startTime = System.currentTimeMillis()
     
     Log.d(TAG, "FAST STREAMING: Processing ~$totalFrames frames with MediaCodec")
-    Log.d(TAG, "GPU delegate: ${mediaPipeBackend?.isUsingGpu() ?: false}, CLAHE: $enableCLAHE, position smoothing: $enablePositionSmoothing")
+    Log.d(TAG, "Pose engine: $poseEngine, GPU delegate: ${mediaPipeBackend?.isUsingGpu() ?: false}, CLAHE: $enableCLAHE, position smoothing: $enablePositionSmoothing")
 
     // only fire the callback when the integer percent actually changes
     var lastProgress = -1
@@ -1032,7 +1102,8 @@ suspend fun ProcVidEmpty(
                                 context = context,
                                 frame = frame,
                                 frameIndex = frameIndex,
-                                presentationTimeUs = decoderBufferInfo.presentationTimeUs
+                                presentationTimeUs = decoderBufferInfo.presentationTimeUs,
+                                poseEngine = poseEngine
                             )
                             encoderState.encodeFrame(modifiedBitmap, frameIndex)
                             // Note: frame/modifiedBitmap is reused via bitmapCache — don't recycle
@@ -1064,15 +1135,17 @@ suspend fun ProcVidEmpty(
     decoder.stop()
     decoder.release()
     extractor.release()
-    releaseMediaPipeBackend()
+    releasePoseEngine(poseEngine)
 
     onProgress?.invoke("processing", 100)
 
     Log.d(TAG, "FAST STREAMING complete. Processed $frameIndex frames, ${AnalysisSession.poseFrames.size} poses detected")
-    logAdaptiveRoiStats(TAG, frameIndex)
+    if (poseEngine == PoseEngine.MEDIAPIPE) logAdaptiveRoiStats(TAG, frameIndex)
     
     // Feature extraction (uses poseFrames which is small)
-    extractGaitFeatures(context, width, height, frameIndex, onProgress)
+    if (poseEngine == PoseEngine.MEDIAPIPE) {
+        extractGaitFeatures(context, width, height, frameIndex, onProgress)
+    }
 
     // Snapshot pose frames before they get cleared below (multiview flow reads this)
     AnalysisSession.lastPoseFramesSnapshot = AnalysisSession.poseFrames.toList()
@@ -1109,6 +1182,7 @@ suspend fun ProcVidEmpty(
 private suspend fun procVidEmptyFallback(
     context: Context,
     outputPath: String,
+    poseEngine: PoseEngine,
     onProgress: ProgressReporter? = null
 ): Uri? {
     val TAG = "ImageProcessing"
@@ -1162,7 +1236,7 @@ private suspend fun procVidEmptyFallback(
     val width = firstFrame.width
     val height = firstFrame.height
     
-    initializeMediaPipeBackend(context)
+    initializePoseEngine(context, poseEngine)
 
     // Set up encoder using shared helper
     val mediaMuxer = MediaMuxer(outputPath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
@@ -1194,7 +1268,8 @@ private suspend fun procVidEmptyFallback(
                 context = context,
                 frame = frame,
                 frameIndex = frameIndex,
-                presentationTimeUs = currTimeUs
+                presentationTimeUs = currTimeUs,
+                poseEngine = poseEngine
             )
             encoderState.encodeFrame(modifiedBitmap, frameIndex)
             frameIndex++
@@ -1209,13 +1284,17 @@ private suspend fun procVidEmptyFallback(
     encoderState.finishEncoding()
     encoderState.release()
     retriever.release()
-    releaseMediaPipeBackend()
+    releasePoseEngine(poseEngine)
 
-    logAdaptiveRoiStats(TAG, frameIndex)
+    if (poseEngine == PoseEngine.MEDIAPIPE) logAdaptiveRoiStats(TAG, frameIndex)
 
     onProgress?.invoke("processing", 100)
 
-    extractGaitFeatures(context, width, height, frameIndex, onProgress)
+    if (poseEngine == PoseEngine.MEDIAPIPE) {
+        extractGaitFeatures(context, width, height, frameIndex, onProgress)
+    }
+
+    AnalysisSession.lastPoseFramesSnapshot = AnalysisSession.poseFrames.toList()
 
     AnalysisSession.rawPoseFrames.clear()
     AnalysisSession.frameList.clear()

@@ -20,6 +20,7 @@ import GaitVision.com.gait.BackFeatureExtractor
 import GaitVision.com.gait.FeatureExtractor
 import GaitVision.com.gait.MultiviewGaitScorer
 import GaitVision.com.mediapipe.PoseSequence
+import GaitVision.com.mediapipe.PoseEngine
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -101,7 +102,11 @@ class MultiviewAnalysisActivity : BaseActivity() {
                 // --- Process side video ---
                 AnalysisSession.galleryUri = side
                 val sideOutputPath = "${cacheDir.absolutePath}/side_temp.mp4"
-                ProcVidEmpty(this@MultiviewAnalysisActivity, sideOutputPath)
+                ProcVidEmpty(
+                    this@MultiviewAnalysisActivity,
+                    sideOutputPath,
+                    poseEngine = PoseEngine.MEDIAPIPE
+                )
                 val sideFps = detectVideoFps(applicationContext, side)
                 val sideFramesCopy = AnalysisSession.lastPoseFramesSnapshot
                 val sideNumFramesTotal = (sideFramesCopy.maxOfOrNull { it.frameIdx } ?: 0) + 1
@@ -118,7 +123,11 @@ class MultiviewAnalysisActivity : BaseActivity() {
                 // --- Process back video ---
                 AnalysisSession.galleryUri = back
                 val backOutputPath = "${cacheDir.absolutePath}/back_temp.mp4"
-                ProcVidEmpty(this@MultiviewAnalysisActivity, backOutputPath)
+                ProcVidEmpty(
+                    this@MultiviewAnalysisActivity,
+                    backOutputPath,
+                    poseEngine = PoseEngine.RTMPOSE
+                )
                 val backFps = detectVideoFps(applicationContext, back)
                 val backFramesCopy = AnalysisSession.lastPoseFramesSnapshot
                 val backNumFramesTotal = (backFramesCopy.maxOfOrNull { it.frameIdx } ?: 0) + 1
@@ -147,7 +156,7 @@ class MultiviewAnalysisActivity : BaseActivity() {
                     tvResult.text = if (score.isNaN()) {
                         "Scoring failed"
                     } else {
-                        "Multiview Score: ${String.format("%.1f", score)} / 100\n(Preliminary model, N=9 - more data needed)"
+                        "Multiview Score: ${String.format("%.1f", score)} / 100\nModel: ${scorer.modelName()}"
                     }
                     scorer.release()
                 }

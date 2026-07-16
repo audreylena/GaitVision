@@ -25,10 +25,10 @@ class MultiviewGaitScorer(private val context: Context) {
         private const val CONFIG_FILE = "multiview_encoder.json"
         private const val NUM_FEATURES = 26
 
-        // Rough placeholder calibration - based on observed training-set
-        // distances (-0.39 to -2.27). Needs recalibration with more data.
-        private const val SCORE_P1 = -3f
-        private const val SCORE_P99 = 0f
+        // Backward-compatible defaults for the original N=9 asset. Newly
+        // trained configs provide their own calibration values.
+        private const val DEFAULT_SCORE_P1 = -3f
+        private const val DEFAULT_SCORE_P99 = 0f
     }
 
     private var interpreter: Interpreter? = null
@@ -37,6 +37,9 @@ class MultiviewGaitScorer(private val context: Context) {
     private var normalCentroid: FloatArray? = null
     private var invCovariance: Array<FloatArray>? = null
     private var latentDim: Int = 2
+    private var scoreP1: Float = DEFAULT_SCORE_P1
+    private var scoreP99: Float = DEFAULT_SCORE_P99
+    private var loadedModelName: String = "multiview_encoder"
     private var isAvailable = false
 
     init {
@@ -47,12 +50,15 @@ class MultiviewGaitScorer(private val context: Context) {
             if (modelBuffer != null && configJson != null) {
                 interpreter = Interpreter(modelBuffer)
                 val config = JSONObject(configJson)
+                loadedModelName = config.optString("model_name", loadedModelName)
 
                 val scaler = config.getJSONObject("scaler")
                 scalerMean = jsonArrayToFloatArray(scaler.getJSONArray("mean"))
                 scalerScale = jsonArrayToFloatArray(scaler.getJSONArray("scale"))
                 normalCentroid = jsonArrayToFloatArray(config.getJSONArray("normal_centroid"))
                 latentDim = config.getInt("latent_dim")
+                scoreP1 = config.optDouble("score_p1", DEFAULT_SCORE_P1.toDouble()).toFloat()
+                scoreP99 = config.optDouble("score_p99", DEFAULT_SCORE_P99.toDouble()).toFloat()
 
                 val invCovArray = config.getJSONArray("inv_covariance")
                 invCovariance = Array(invCovArray.length()) { i ->
@@ -60,7 +66,7 @@ class MultiviewGaitScorer(private val context: Context) {
                 }
 
                 isAvailable = true
-                Log.d(TAG, "MultiviewGaitScorer initialized (preliminary N=9 model)")
+                Log.d(TAG, "MultiviewGaitScorer initialized ($loadedModelName)")
             } else {
                 Log.w(TAG, "MultiviewGaitScorer: model or config not found in assets")
             }
@@ -104,9 +110,9 @@ class MultiviewGaitScorer(private val context: Context) {
             val dist = mahalanobisDistance(z, centroid, invCov)
             val rawScore = -dist
 
-            val span = SCORE_P99 - SCORE_P1
+            val span = scoreP99 - scoreP1
             val healthScore = if (span != 0f) {
-                ((rawScore - SCORE_P1) / span * 100f).coerceIn(0f, 100f)
+                ((rawScore - scoreP1) / span * 100f).coerceIn(0f, 100f)
             } else 50f
 
             if (BuildConfig.DEBUG) {
@@ -181,4 +187,6 @@ class MultiviewGaitScorer(private val context: Context) {
         interpreter?.close()
         interpreter = null
     }
+
+    fun modelName(): String = loadedModelName
 }

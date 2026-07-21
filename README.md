@@ -129,7 +129,7 @@ conditions not in the dataset.
 
 ---
 
-## Known limitations(save yourself the headache)
+## Known limitations
 
 - **JDK 17 is required.** Newer JDKs fail with a cryptic version error. On macOS:
   `export JAVA_HOME=$(/usr/libexec/java_home -v 17)` (must be re-run per terminal).

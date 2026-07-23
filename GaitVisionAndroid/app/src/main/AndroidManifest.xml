@@ -115,6 +115,11 @@
             tools:ignore="DiscouragedApi,LockedOrientationActivity" />
 
         <activity
+            android:name="GaitVision.com.ui.MultiviewResultsActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.GaitVision" />
+        <activity
             android:name="GaitVision.com.ui.ProgressOverTimeActivity"
             android:exported="false"
             android:screenOrientation="portrait"

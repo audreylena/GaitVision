@@ -144,10 +144,20 @@ class MultiviewAnalysisActivity : BaseActivity() {
                     val scorer = MultiviewGaitScorer(applicationContext)
                     val score = scorer.score(sideFeatures, backFeatures)
 
-                    tvResult.text = if (score.isNaN()) {
-                        "Scoring failed"
+                    if (score.isNaN()) {
+                        tvResult.text = "Scoring failed"
                     } else {
-                        "Multiview Score: ${String.format("%.1f", score)} / 100\n(Preliminary model, N=9 - more data needed)"
+                        val intent = Intent(
+                            this@MultiviewAnalysisActivity,
+                            MultiviewResultsActivity::class.java
+                        ).apply {
+                            putExtra(
+                                MultiviewResultsActivity.EXTRA_MULTIVIEW_SCORE,
+                                score
+                            )
+                        }
+
+                        startActivity(intent)
                     }
                     scorer.release()
                 }
